@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Opinary Poll</title>
+<link rel="preconnect" href="https://m.media-amazon.com" crossorigin>
+<link rel="dns-prefetch" href="https://www.amazon.com">
+<link rel="dns-prefetch" href="https://www.bestbuy.com">
+<!--POLL_DATA_PLACEHOLDER-->
+<style>
+  :root {
+    --accent: #ff5a1f;
+    --accent-soft: #ffe9df;
+    --accent-softer: #fff3ec;
+    --ink: #111;
+    --muted: #6a6a6a;
+    --hair: #e6e6e6;
+    --bg: #fff;
+    --green: #2e7d32;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  .serif { font-family: "Playfair Display", Georgia, "Times New Roman", serif; }
+
+  .card {
+    background: var(--bg);
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 0;
+    border-top: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+  }
+  .inner { padding: 22px 24px 14px; }
+
+  /* Top chrome */
+  .chrome {
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--ink);
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 14px 0 12px;
+    border-bottom: 1px solid var(--hair);
+    margin-bottom: 18px;
+  }
+  .chrome .dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    background: #e53935;
+    border-radius: 50%;
+    margin: 0 6px;
+    vertical-align: middle;
+  }
+  .chrome .votes { color: var(--ink); }
+
+  /* Question */
+  .q-serif {
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-size: 26px;
+    line-height: 1.25;
+    text-align: center;
+    margin: 10px 6px 28px;
+    font-weight: 500;
+  }
+  .q-sans {
+    font-size: 18px;
+    font-weight: 700;
+    text-align: left;
+    line-height: 1.3;
+    margin: 4px 0 18px;
+  }
+
+  /* ----- Vote state ----- */
+  .opts-vote { display: flex; flex-direction: column; gap: 10px; }
+  .opt-vote {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    background: #fff;
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.08s ease, border-color 0.15s;
+    min-height: 56px;
+    overflow: hidden;
+  }
+  .opt-vote:hover { border-color: var(--accent); }
+  .opt-vote:active { transform: scale(0.995); }
+  .opt-vote .radio-box {
+    width: 72px;
+    background: #f2f2f2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .opt-vote .radio {
+    width: 18px; height: 18px;
+    border: 2px solid #c7c7c7;
+    border-radius: 50%;
+    display: block;
+  }
+  .opt-vote:hover .radio { border-color: var(--accent); }
+  .opt-vote .label {
+    flex-grow: 1;
+    padding: 14px 18px;
+    text-align: left;
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 16px;
+  }
+
+  /* ----- Results state ----- */
+  .opts-results { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+  .opt-res {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #f2f2f2;
+    border-radius: 4px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .opt-res:not(.chosen):hover { background: #eaeaea; }
+  .opt-res .label { flex-grow: 1; color: var(--ink); }
+  .opt-res .pct { color: var(--muted); font-weight: 600; }
+  .opt-res .bar-fill {
+    position: absolute;
+    left: 0; bottom: 0;
+    height: 2px;
+    background: #cfcfcf;
+    border-radius: 2px;
+    width: 0;
+  }
+
+  .opt-res.chosen {
+    background: var(--accent-softer);
+    border-left: 4px solid var(--accent);
+    padding: 14px 14px 14px 14px;
+    border-radius: 4px;
+  }
+  .opt-res.chosen::before {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: var(--pct, 0%);
+    background: var(--accent-soft);
+    z-index: 0;
+    transition: width 0.6s ease;
+  }
+  .opt-res.chosen .label,
+  .opt-res.chosen .pct,
+  .opt-res.chosen .check { z-index: 1; position: relative; }
+  .opt-res.chosen .label { font-weight: 700; color: var(--ink); }
+  .opt-res.chosen .pct { color: var(--ink); font-weight: 800; font-size: 16px; }
+  .opt-res.chosen .check {
+    width: 24px; height: 24px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 900;
+    flex-shrink: 0;
+    order: 2;
+    margin-left: 4px;
+  }
+
+  /* Bridge */
+  .bridge {
+    margin: 28px 6px 22px;
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-size: 19px;
+    line-height: 1.35;
+    text-align: center;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* Product cards */
+  .recs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 0 12px;
+  }
+  .recs[data-count="1"] { grid-template-columns: minmax(0, 340px); justify-content: center; }
+  .recs[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* Responsive breakpoints — the widget iframe can be any width */
+  @media (max-width: 440px) {
+    .recs,
+    .recs[data-count="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 330px) {
+    .recs,
+    .recs[data-count="2"],
+    .recs[data-count="3"] { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .rec {
+    position: relative;
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    padding: 18px 8px 12px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #fff;
+  }
+  .rec .badge {
+    position: absolute;
+    top: -10px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .rec .img {
+    height: 80px;
+    margin: 4px 0 10px;
+    background: #f7f7f7;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px;
+    color: #bdbdbd;
+  }
+  .rec .img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .rec .title {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 4px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .rec .desc {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.4;
+    flex-grow: 1;
+    margin-bottom: 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .rec .merchant-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; min-width: 0; }
+  .rec .merchant {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 10px;
+    line-height: 1.15;
+    padding-top: 6px;
+    border-top: 1px solid var(--hair);
+    min-width: 0;
+  }
+  .rec .merchant:first-child { border-top: none; padding-top: 0; }
+  .rec .merchant .price-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .rec .merchant-logo { width: 36px; height: 12px; flex-shrink: 0; }
+  .rec .merchant-logo svg { width: 100%; height: 100%; display: block; }
+  .rec .merchant .price {
+    font-weight: 700;
+    color: var(--ink);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .rec .merchant .lowest {
+    color: var(--green);
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+  .rec .merchant.muted .price { color: var(--muted); font-weight: 600; }
+  .rec .merchant .buy {
+    display: block;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .rec .merchant .buy:hover { filter: brightness(0.95); }
+  .rec .merchant.muted .buy { background: #fff; color: var(--ink); border: 1px solid var(--hair); }
+
+  .caption {
+    font-size: 10px;
+    color: var(--muted);
+    text-align: left;
+    margin: 14px 0 14px;
+    line-height: 1.4;
+  }
+  .caption a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .caption a:hover { text-decoration: underline; }
+
+  /* Footer */
+  .footer {
+    border-top: 1px solid var(--hair);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer .publisher { font-weight: 700; font-size: 13px; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+  .footer .publisher img { max-height: 18px; vertical-align: middle; }
+  .footer .brand {
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+  }
+
+  .loading, .error {
+    text-align: center;
+    padding: 30px 10px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .error { color: #b00020; }
+</style>
+</head>
+<body>
+<div class="card" id="root">
+  <div class="inner"><div class="loading">Loading poll…</div></div>
+</div>
+
+<script>
+(function () {
+  const pollId = window.location.pathname.split('/').filter(Boolean).pop();
+  const root = document.getElementById('root');
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function postHeight() {
+    try {
+      const h = document.documentElement.scrollHeight;
+      window.parent.postMessage({ type: 'opinary-height', height: h }, '*');
+    } catch (_) {}
+  }
+
+  function chrome(votes) {
+    const votesPart = votes != null ? ` <span class="dot"></span> <span class="votes">${votes} VOTE${votes === 1 ? '' : 'S'}</span>` : '';
+    return `<div class="chrome">LIVE POLL${votesPart}</div>`;
+  }
+
+  function footer(poll) {
+    const publisher = poll.publisher_logo
+      ? `<span class="publisher"><img src="${esc(poll.publisher_logo)}" alt="${esc(poll.publisher_name || '')}"></span>`
+      : (poll.publisher_name ? `<span class="publisher">${esc(poll.publisher_name).toUpperCase()}</span>` : '<span class="publisher"></span>');
+    return `<div class="footer">${publisher}<span class="brand">Opinary</span></div>`;
+  }
+
+  function renderVote(poll) {
+    const opts = poll.options.map(o => `
+      <button class="opt-vote" data-id="${esc(o.id)}">
+        <span class="radio-box"><span class="radio"></span></span>
+        <span class="label">${esc(o.label)}</span>
+      </button>
+    `).join('');
+    root.innerHTML = `
+      <div class="inner">
+        ${chrome(null)}
+        <div class="q-serif">${esc(poll.question)}</div>
+        <div class="opts-vote">${opts}</div>
+      </div>
+      ${footer(poll)}
+    `;
+    root.querySelectorAll('.opt-vote').forEach(btn => {
+      btn.addEventListener('click', () => castVote(poll, btn.dataset.id));
+    });
+    postHeight();
+  }
+
+  // State: which option is currently being viewed in the results screen.
+  // Initially = the option the user voted for; updated when they click a row.
+  let viewingOptionId = null;
+  let lastData = null;
+  let lastPoll = null;
+
+  function renderResults(poll, data) {
+    lastPoll = poll;
+    lastData = data;
+    if (viewingOptionId == null) viewingOptionId = data.voted_option_id;
+
+    const total = data.total || 0;
+    const viewed = (data.by_option || {})[viewingOptionId] || {};
+    const rows = data.results.map(r => {
+      const pct = total ? Math.round((r.count / total) * 100) : 0;
+      const isViewing = r.option_id === viewingOptionId;
+      if (isViewing) {
+        return `<div class="opt-res chosen" style="--pct:${pct}%" data-oid="${esc(r.option_id)}">
+          <span class="label">${esc(r.label)}</span>
+          <span class="pct">${pct}%</span>
+          <span class="check">✓</span>
+        </div>`;
+      }
+      const barPct = total ? Math.max(4, (r.count / total) * 100) : 0;
+      return `<div class="opt-res" data-oid="${esc(r.option_id)}">
+        <span class="label">${esc(r.label)}</span>
+        <span class="pct">${pct}%</span>
+        <span class="bar-fill" style="width:${barPct}%"></span>
+      </div>`;
+    }).join('');
+
+    const recCount = (viewed.recommendations || []).length;
+
+    // Inline SVG logos — render reliably without any external CDN dependency.
+    const AMZN_LOGO = `
+      <svg viewBox="0 0 90 30" xmlns="http://www.w3.org/2000/svg" aria-label="Amazon">
+        <text x="0" y="20" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#111">amazon</text>
+        <path d="M1 25 C 28 34, 62 34, 80 24" stroke="#ff9900" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <polygon points="75,19 83,24 76,29" fill="#ff9900"/>
+      </svg>`;
+    const BBY_LOGO = `
+      <svg viewBox="0 0 90 30" xmlns="http://www.w3.org/2000/svg" aria-label="Best Buy">
+        <path d="M0 4 L74 4 L88 15 L74 26 L0 26 Z" fill="#fff200" stroke="#000" stroke-width="0.5"/>
+        <text x="5" y="19" font-family="Arial, sans-serif" font-size="10.5" font-weight="900" fill="#000">BEST BUY</text>
+      </svg>`;
+
+    const recs = (viewed.recommendations || []).map(p => {
+      const merchants = [];
+      if (p.price) {
+        merchants.push({ logo: AMZN_LOGO, name: 'Amazon', price: p.price, lowest: true, url: p.amazon_url });
+      }
+      if (p.alt_price) {
+        merchants.push({ logo: BBY_LOGO, name: 'Best Buy', price: p.alt_price, lowest: false, url: p.bestbuy_url });
+      }
+      const merchantBlock = merchants.length ? `
+        <div class="merchant-list">
+          ${merchants.map(m => `
+            <div class="merchant${m.lowest ? '' : ' muted'}">
+              <div class="price-row">
+                <span class="merchant-logo" aria-label="${esc(m.name)}">${m.logo}</span>
+                <span class="price">${esc(m.price)}</span>
+                ${m.lowest ? '<span class="lowest">LOWEST</span>' : ''}
+              </div>
+              <a class="buy" href="${esc(m.url || '#')}" target="_blank" rel="noopener nofollow sponsored">Buy now</a>
+            </div>
+          `).join('')}
+        </div>` : '';
+      const imgBlock = p.image_url
+        ? `<div class="img"><img src="${esc(p.image_url)}" alt=""></div>`
+        : `<div class="img">🛍</div>`;
+      return `
+        <div class="rec">
+          <div class="badge">${esc(p.badge)}</div>
+          ${imgBlock}
+          <div class="title">${esc(p.title)}</div>
+          <div class="desc">${esc(p.description)}</div>
+          ${merchantBlock}
+        </div>
+      `;
+    }).join('');
+
+    const viewedRow = data.results.find(r => r.option_id === viewingOptionId);
+    const viewedLabel = viewedRow ? viewedRow.label : '';
+    const isYourVote = viewingOptionId === data.voted_option_id;
+    const captionText = isYourVote
+      ? `You chose <strong>${esc(viewedLabel)}</strong>. Products based on what readers with the same answer picked.`
+      : `Viewing readers who picked <strong>${esc(viewedLabel)}</strong>. <a href="#" id="back-to-yours">Back to your vote →</a>`;
+
+    root.innerHTML = `
+      <div class="inner">
+        ${chrome(total)}
+        <div class="q-sans">${esc(poll.question)}</div>
+        <div class="opts-results">${rows}</div>
+        ${viewed.bridge ? `<div class="bridge">${esc(viewed.bridge)}</div>` : ''}
+        ${recs ? `<div class="recs" data-count="${recCount}">${recs}</div>` : ''}
+        ${viewed.recommendations ? `<div class="caption">${captionText}</div>` : ''}
+      </div>
+      ${footer(poll)}
+    `;
+
+    root.querySelectorAll('.opt-res').forEach(el => {
+      el.addEventListener('click', () => {
+        const oid = el.dataset.oid;
+        if (oid && oid !== viewingOptionId) {
+          viewingOptionId = oid;
+          renderResults(lastPoll, lastData);
+        }
+      });
+    });
+    const back = document.getElementById('back-to-yours');
+    if (back) {
+      back.addEventListener('click', (e) => {
+        e.preventDefault();
+        viewingOptionId = lastData.voted_option_id;
+        renderResults(lastPoll, lastData);
+      });
+    }
+
+    postHeight();
+  }
+
+  function renderError(msg) {
+    root.innerHTML = `<div class="inner"><div class="error">${esc(msg)}</div></div>`;
+    postHeight();
+  }
+
+  async function castVote(poll, optionId) {
+    root.innerHTML = `<div class="inner">${chrome(null)}<div class="loading">Tallying…</div></div>${footer(poll)}`;
+    postHeight();
+    try {
+      const res = await fetch(`/api/polls/${encodeURIComponent(pollId)}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ option_id: optionId }),
+      });
+      if (!res.ok) throw new Error('vote failed');
+      const data = await res.json();
+      viewingOptionId = data.voted_option_id;  // start by showing the user's chosen option
+      renderResults(poll, data);
+    } catch (e) {
+      renderError('Could not record your vote. Please try again.');
+    }
+  }
+
+  async function boot() {
+    // Fast path: server-rendered poll data is inlined in a <script> tag.
+    // Skips an extra HTTP roundtrip before first paint.
+    const inlineEl = document.getElementById('poll-data');
+    if (inlineEl) {
+      try {
+        const poll = JSON.parse(inlineEl.textContent);
+        renderVote(poll);
+        return;
+      } catch (_) { /* fall through to fetch */ }
+    }
+    try {
+      const res = await fetch(`/api/polls/${encodeURIComponent(pollId)}`);
+      if (!res.ok) throw new Error('poll not found');
+      const poll = await res.json();
+      renderVote(poll);
+    } catch (e) {
+      renderError('Poll unavailable.');
+    }
+  }
+
+  boot();
+  window.addEventListener('load', postHeight);
+  window.addEventListener('resize', postHeight);
+})();
+</script>
+</body>
+</html>

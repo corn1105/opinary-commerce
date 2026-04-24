@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Publisher preview · OpinaryCommerce</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 680px; margin: 40px auto; padding: 0 20px; color: #222; line-height: 1.6; }
+  h1 { font-size: 28px; line-height: 1.15; }
+  .meta { color: #888; font-size: 13px; margin-bottom: 30px; }
+  .bar {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    background: #fafafa; padding: 10px 14px; border-radius: 6px; margin: 0 0 24px;
+    font-family: -apple-system, sans-serif; font-size: 12px; color: #555;
+  }
+  .bar .id { font-family: ui-monospace, Consolas, monospace; background: #fff; padding: 3px 6px; border: 1px solid #e6e6e6; border-radius: 3px; }
+  .bar a { color: #ff5a1f; text-decoration: none; font-weight: 600; }
+  .bar a:hover { text-decoration: underline; }
+  .controls { background: #fafafa; padding: 12px 16px; border-radius: 6px; margin-bottom: 24px; font-family: -apple-system, sans-serif; font-size: 13px; }
+  .controls input { font-family: monospace; padding: 4px 6px; width: 320px; }
+  .error { background: #fde6ea; color: #800020; padding: 10px 14px; border-radius: 6px; font-family: sans-serif; font-size: 13px; }
+</style>
+</head>
+<body>
+  <h1 id="headline">Readers are rethinking their everyday gear</h1>
+  <div class="meta">By the editors · 4 min read</div>
+  <p>The last few years have shifted how people shop for the stuff they use most. We asked readers where they stand — and what they'd upgrade to next.</p>
+
+  <div id="bar-slot"></div>
+
+  <div id="embed-slot"></div>
+
+  <p>Readers who voted at the ends of the spectrum tend to regret their current setup most. Below, what our editors have been recommending — and what readers told us they actually bought.</p>
+  <p>More in the next edition.</p>
+
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  let id = params.get('id') || localStorage.getItem('demo_poll_id') || '';
+  if (params.get('id')) localStorage.setItem('demo_poll_id', params.get('id'));
+
+  const bar = document.getElementById('bar-slot');
+  const slot = document.getElementById('embed-slot');
+
+  if (!id) {
+    bar.innerHTML = `<div class="controls">No poll ID yet. Paste one: <input id="pid" placeholder="poll uuid"><button onclick="localStorage.setItem('demo_poll_id', document.getElementById('pid').value); location.search='?id='+encodeURIComponent(document.getElementById('pid').value);">Load</button></div>`;
+    slot.innerHTML = `<div class="error">Open this page with <code>?id=&lt;poll-uuid&gt;</code>, or use the <a href="/admin/">admin panel</a> to preview a poll directly.</div>`;
+    return;
+  }
+
+  bar.innerHTML = `
+    <div class="bar">
+      <div>Previewing poll <span class="id">${id}</span></div>
+      <div><a href="/admin/">← back to admin</a></div>
+    </div>
+  `;
+
+  const s = document.createElement('script');
+  s.src = '/embed.js';
+  s.setAttribute('data-poll-id', id);
+  slot.appendChild(s);
+})();
+</script>
+</body>
+</html>

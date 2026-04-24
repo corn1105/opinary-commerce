@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpinaryCommerce · Admin</title>
+<style>
+  :root {
+    --accent: #ff5a1f;
+    --accent-soft: #ffe9df;
+    --ink: #111;
+    --muted: #6a6a6a;
+    --hair: #e6e6e6;
+    --bg: #fafafa;
+    --card: #fff;
+    --danger: #b00020;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--hair);
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  header .brand { font-weight: 700; font-size: 16px; }
+  header .brand em { color: var(--accent); font-style: normal; }
+  header button { background: none; border: 1px solid var(--hair); padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .card { background: var(--card); border: 1px solid var(--hair); border-radius: 8px; padding: 18px; margin-bottom: 18px; }
+  h2 { margin: 0 0 14px; font-size: 18px; }
+  h3 { margin: 18px 0 8px; font-size: 15px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=password], textarea, select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--hair); border-radius: 6px;
+    font-size: 14px; font-family: inherit;
+  }
+  textarea { min-height: 60px; resize: vertical; }
+  button.primary {
+    background: var(--accent); color: #fff; border: none; padding: 9px 14px;
+    border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;
+  }
+  button.primary:hover { filter: brightness(0.95); }
+  button.secondary {
+    background: #fff; border: 1px solid var(--hair); padding: 8px 12px;
+    border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  button.danger { color: var(--danger); border-color: #f3c7ce; background: #fff; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--hair); font-size: 13px; }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .row input { flex-grow: 1; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .pill { display: inline-block; background: var(--accent-soft); color: var(--accent);
+          font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .pill.archived { background: #eee; color: var(--muted); }
+  .embed-snippet {
+    background: #111; color: #e0e0e0; padding: 10px 12px; border-radius: 6px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px; overflow-x: auto;
+  }
+  .rec-card {
+    border: 1px solid var(--hair); border-radius: 6px; padding: 12px 14px; margin-bottom: 10px; background: #fff;
+  }
+  .rec-card .bridge-box {
+    background: var(--accent-soft); padding: 10px 12px; border-radius: 4px; font-size: 14px; line-height: 1.4;
+    font-family: Georgia, serif; margin-bottom: 10px;
+  }
+  .rec-card .rec-row { display: flex; gap: 10px; font-size: 12px; padding: 6px 0; border-top: 1px dashed var(--hair); }
+  .rec-card .rec-row strong { color: var(--ink); }
+  .login-wrap { max-width: 360px; margin: 80px auto; }
+  .error { color: var(--danger); font-size: 13px; margin-top: 8px; }
+  .hidden { display: none; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+</style>
+</head>
+<body>
+
+<div id="login-view" class="login-wrap hidden">
+  <div class="card">
+    <h2>OpinaryCommerce admin</h2>
+    <label>Password</label>
+    <input id="pw" type="password" autofocus>
+    <div style="margin-top: 12px;"><button class="primary" onclick="login()">Sign in</button></div>
+    <div id="login-error" class="error"></div>
+  </div>
+</div>
+
+<header id="app-header" class="hidden">
+  <div class="brand">OpinaryCommerce · <em>admin</em></div>
+  <div>
+    <button onclick="showList()">Polls</button>
+    <button onclick="showEditor(null)">+ New poll</button>
+  </div>
+</header>
+
+<main id="app-main" class="hidden"></main>
+
+<script>
+const $ = id => document.getElementById(id);
+let STATE = { view: 'login', polls: [], current: null };
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    ...opts,
+  });
+  if (res.status === 401) { showLogin(); throw new Error('unauthorized'); }
+  if (!res.ok) { let t = await res.text(); throw new Error(t || res.statusText); }
+  return res.json();
+}
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showLogin() {
+  $('login-view').classList.remove('hidden');
+  $('app-header').classList.add('hidden');
+  $('app-main').classList.add('hidden');
+}
+function showApp() {
+  $('login-view').classList.add('hidden');
+  $('app-header').classList.remove('hidden');
+  $('app-main').classList.remove('hidden');
+}
+
+async function login() {
+  const pw = $('pw').value;
+  try {
+    await api('/admin/api/auth', { method: 'POST', body: JSON.stringify({ password: pw }) });
+    showApp(); showList();
+  } catch (e) { $('login-error').textContent = 'Invalid password.'; }
+}
+
+async function showList() {
+  showApp();
+  try {
+    const { polls } = await api('/admin/api/polls');
+    STATE.polls = polls;
+    $('app-main').innerHTML = `
+      <div class="card">
+        <h2>Polls (${polls.length})</h2>
+        ${polls.length === 0 ? '<div class="muted">No polls yet. Click "+ New poll" to create one.</div>' : `
+          <table>
+            <thead><tr><th>Question</th><th>Status</th><th>Votes</th><th>Options</th><th></th></tr></thead>
+            <tbody>
+              ${polls.map(p => `
+                <tr>
+                  <td><strong>${esc(p.question)}</strong><div class="muted" style="margin-top:2px">${esc(p.id)}</div></td>
+                  <td><span class="pill ${p.status === 'archived' ? 'archived' : ''}">${esc(p.status)}</span></td>
+                  <td>${p.vote_count}</td>
+                  <td>${(p.options || []).length}</td>
+                  <td class="actions">
+                    <button class="primary" onclick="window.open('/static/demo.html?id=${esc(p.id)}', '_blank')">Preview</button>
+                    <button class="secondary" onclick="showEditor('${esc(p.id)}')">Edit</button>
+                    <button class="secondary" onclick="showRecs('${esc(p.id)}')">Recs</button>
+                    <button class="danger" onclick="deletePoll('${esc(p.id)}')">Delete</button>
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>`}
+      </div>
+    `;
+  } catch (e) { console.error(e); }
+}
+
+function showEditor(pollId) {
+  showApp();
+  const poll = pollId ? STATE.polls.find(p => p.id === pollId) : null;
+  const opts = poll ? poll.options : [{ label: '' }, { label: '' }];
+  $('app-main').innerHTML = `
+    <div class="card">
+      <h2>${poll ? 'Edit poll' : 'New poll'}</h2>
+      <label>Question</label>
+      <textarea id="q">${esc(poll ? poll.question : '')}</textarea>
+      <h3>Options (2–4)</h3>
+      <div id="opts"></div>
+      <button class="secondary" onclick="addOpt()" id="addOptBtn">+ Add option</button>
+      <h3>Admin context notes (optional)</h3>
+      <div class="muted" style="margin-bottom: 6px;">Passed to Claude when generating recommendations. Helps steer towards the product category.</div>
+      <textarea id="notes">${esc(poll ? (poll.context_notes || '') : '')}</textarea>
+      <h3>Publisher branding (optional)</h3>
+      <div class="grid-2">
+        <div>
+          <label>Publisher name</label>
+          <input type="text" id="pub_name" value="${esc(poll ? (poll.publisher_name || '') : '')}">
+        </div>
+        <div>
+          <label>Publisher logo URL</label>
+          <input type="text" id="pub_logo" value="${esc(poll ? (poll.publisher_logo || '') : '')}">
+        </div>
+      </div>
+      ${poll ? `
+        <h3>Status</h3>
+        <select id="status">
+          <option value="active" ${poll.status === 'active' ? 'selected' : ''}>active</option>
+          <option value="archived" ${poll.status === 'archived' ? 'selected' : ''}>archived</option>
+        </select>` : ''}
+      <div style="margin-top: 18px; display: flex; gap: 10px;">
+        <button class="primary" onclick="savePoll(${poll ? `'${esc(poll.id)}'` : 'null'})">Save</button>
+        <button class="secondary" onclick="showList()">Cancel</button>
+      </div>
+      <div id="save-error" class="error"></div>
+      ${poll ? `
+        <h3 style="margin-top: 28px;">Preview</h3>
+        <button class="primary" onclick="window.open('/static/demo.html?id=${esc(poll.id)}', '_blank')">Open preview in new tab →</button>
+        <h3 style="margin-top: 28px;">Embed snippet</h3>
+        <div class="embed-snippet">&lt;script src="${location.origin}/embed.js" data-poll-id="${esc(poll.id)}"&gt;&lt;/script&gt;</div>
+      ` : ''}
+    </div>
+  `;
+  renderOpts(opts);
+}
+
+function renderOpts(opts) {
+  const html = opts.map((o, i) => `
+    <div class="row" data-i="${i}">
+      <input type="text" value="${esc(o.label || '')}" placeholder="Option ${i + 1} label">
+      <button class="secondary" onclick="removeOpt(${i})">×</button>
+    </div>`).join('');
+  $('opts').innerHTML = html;
+  $('addOptBtn').disabled = opts.length >= 4;
+  STATE.editOpts = opts;
+}
+
+function addOpt() {
+  const current = collectOpts();
+  if (current.length >= 4) return;
+  renderOpts([...current, { label: '' }]);
+}
+function removeOpt(i) {
+  const current = collectOpts();
+  if (current.length <= 2) return;
+  current.splice(i, 1);
+  renderOpts(current);
+}
+function collectOpts() {
+  return Array.from(document.querySelectorAll('#opts .row input')).map(el => ({ label: el.value }));
+}
+
+async function savePoll(pollId) {
+  const body = {
+    question: $('q').value.trim(),
+    options: collectOpts().filter(o => o.label.trim()).map(o => ({ label: o.label.trim() })),
+    context_notes: $('notes').value.trim() || null,
+    publisher_name: $('pub_name').value.trim() || null,
+    publisher_logo: $('pub_logo').value.trim() || null,
+  };
+  if ($('status')) body.status = $('status').value;
+  if (!body.question || body.options.length < 2) {
+    $('save-error').textContent = 'Need a question and at least 2 options.';
+    return;
+  }
+  try {
+    if (pollId) {
+      await api(`/admin/api/polls/${encodeURIComponent(pollId)}`, { method: 'PUT', body: JSON.stringify(body) });
+    } else {
+      await api('/admin/api/polls', { method: 'POST', body: JSON.stringify(body) });
+    }
+    showList();
+  } catch (e) { $('save-error').textContent = 'Save failed: ' + e.message; }
+}
+
+async function deletePoll(pollId) {
+  if (!confirm('Delete this poll and all its votes/recs?')) return;
+  await api(`/admin/api/polls/${encodeURIComponent(pollId)}`, { method: 'DELETE' });
+  showList();
+}
+
+async function showRecs(pollId) {
+  showApp();
+  const { options, recommendations } = await api(`/admin/api/polls/${encodeURIComponent(pollId)}/recommendations`);
+  const byKey = {};
+  for (const r of recommendations) byKey[`${r.option_id}|${r.locale}`] = r;
+
+  $('app-main').innerHTML = `
+    <div class="card">
+      <h2>Recommendations</h2>
+      <div class="muted" style="margin-bottom: 14px;">Cached per (option, locale). First voter on an option+locale triggers generation; the cache serves everyone after. Edit the bridge inline, or regenerate the whole payload.</div>
+      ${options.map(o => `
+        <h3>${esc(o.label)}</h3>
+        ${['en', 'de'].map(loc => {
+          const key = `${o.id}|${loc}`;
+          const rec = byKey[key];
+          return `<div class="rec-card">
+            <div class="muted" style="margin-bottom: 6px;">Locale: <strong>${loc}</strong> ${rec ? `· generated ${new Date(rec.generated_at).toLocaleString()}` : '· <em>not generated yet</em>'}</div>
+            ${rec ? `
+              <div class="bridge-box" contenteditable="true" id="bridge-${esc(o.id)}-${loc}">${esc(rec.bridge)}</div>
+              ${(rec.products || []).map(p => `
+                <div class="rec-row">
+                  <span class="pill">${esc(p.badge)}</span>
+                  <div><strong>${esc(p.title)}</strong> — ${esc(p.description)} <span class="muted">[${esc(p.query)}]</span></div>
+                </div>`).join('')}
+              <div style="margin-top: 10px; display: flex; gap: 8px;">
+                <button class="secondary" onclick="saveBridge('${esc(o.id)}', '${loc}')">Save bridge edit</button>
+                <button class="primary" onclick="regenerate('${esc(o.id)}', '${loc}')">Regenerate</button>
+              </div>` : `
+              <button class="primary" onclick="regenerate('${esc(o.id)}', '${loc}')">Generate now</button>`}
+          </div>`;
+        }).join('')}
+      `).join('')}
+      <div style="margin-top: 14px;"><button class="secondary" onclick="showList()">Back to polls</button></div>
+    </div>
+  `;
+  STATE.currentPollId = pollId;
+}
+
+async function regenerate(optionId, locale) {
+  if (!confirm(`Regenerate ${locale} recommendations? This will call Claude and overwrite the cache.`)) return;
+  try {
+    await api(`/admin/api/options/${encodeURIComponent(optionId)}/regenerate-recs`, {
+      method: 'POST', body: JSON.stringify({ locale }),
+    });
+    showRecs(STATE.currentPollId);
+  } catch (e) { alert('Regenerate failed: ' + e.message); }
+}
+
+async function saveBridge(optionId, locale) {
+  const el = document.getElementById(`bridge-${optionId}-${locale}`);
+  if (!el) return;
+  const bridge = el.textContent.trim();
+  if (!bridge) return;
+  try {
+    await api(`/admin/api/options/${encodeURIComponent(optionId)}/recommendations/bridge`, {
+      method: 'PATCH', body: JSON.stringify({ locale, bridge }),
+    });
+    el.style.outline = '2px solid #4caf50';
+    setTimeout(() => { el.style.outline = ''; }, 800);
+  } catch (e) { alert('Save failed: ' + e.message); }
+}
+
+// Try to load list on boot; fall back to login on 401.
+(async function boot() {
+  try { await api('/admin/api/polls'); showApp(); showList(); }
+  catch (e) { showLogin(); }
+})();
+</script>
+</body>
+</html>
