@@ -1,3 +1,4 @@
+import time
 from typing import Optional
 
 from supabase import Client, create_client
@@ -12,6 +13,30 @@ def get_db() -> Client:
     if _client is None:
         _client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     return _client
+
+
+# In-process TTL cache for get_poll. Keeps scripted 400-floods (and any other
+# hot read loop) from hammering Supabase. Busted by create/update/delete. Stale
+# window is tiny — a fresh admin edit shows up next request on that process.
+_POLL_TTL_SECONDS = 60
+_poll_cache: dict[str, tuple[float, Optional[dict]]] = {}
+
+
+def _cache_get(poll_id: str) -> Optional[tuple[float, Optional[dict]]]:
+    entry = _poll_cache.get(poll_id)
+    if entry and entry[0] > time.monotonic():
+        return entry
+    if entry:
+        _poll_cache.pop(poll_id, None)
+    return None
+
+
+def _cache_set(poll_id: str, data: Optional[dict]) -> None:
+    _poll_cache[poll_id] = (time.monotonic() + _POLL_TTL_SECONDS, data)
+
+
+def _cache_bust(poll_id: str) -> None:
+    _poll_cache.pop(poll_id, None)
 
 
 # ---------- Polls ----------
@@ -44,13 +69,16 @@ async def list_polls() -> list[dict]:
 
 
 async def get_poll(poll_id: str) -> Optional[dict]:
+    cached = _cache_get(poll_id)
+    if cached is not None:
+        return cached[1]
     db = get_db()
     res = db.table("polls").select("*").eq("id", poll_id).maybe_single().execute()
     poll = res.data if res else None
-    if not poll:
-        return None
-    opts = db.table("poll_options").select("*").eq("poll_id", poll_id).order("sort_order").execute().data or []
-    poll["options"] = opts
+    if poll:
+        opts = db.table("poll_options").select("*").eq("poll_id", poll_id).order("sort_order").execute().data or []
+        poll["options"] = opts
+    _cache_set(poll_id, poll)
     return poll
 
 
@@ -78,6 +106,7 @@ async def create_poll(
 
 async def update_poll(poll_id: str, patch: dict, options: Optional[list[dict]]) -> dict:
     db = get_db()
+    _cache_bust(poll_id)
     if patch:
         db.table("polls").update(patch).eq("id", poll_id).execute()
     if options is not None:
@@ -95,6 +124,7 @@ async def update_poll(poll_id: str, patch: dict, options: Optional[list[dict]]) 
 
 
 async def delete_poll(poll_id: str) -> None:
+    _cache_bust(poll_id)
     get_db().table("polls").delete().eq("id", poll_id).execute()
 
 
