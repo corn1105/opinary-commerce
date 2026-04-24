@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.routes.admin import router as admin_router
 from app.routes.public import router as public_router
 
-app = FastAPI(title="OpinaryCommerce", version="0.1.0")
+app = FastAPI(title="OpinaryCommerce", version="0.1.1")
 
 # Compress responses > 1KB — biggest win on the vote payload (~10KB → ~3KB).
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -32,7 +32,7 @@ app.include_router(admin_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": app.version}
 
 
 @app.get("/", response_class=HTMLResponse)
