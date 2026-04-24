@@ -234,6 +234,103 @@
     padding: 60px 24px; text-align: center; color: var(--muted); font-size: 14px;
   }
 
+  /* ===== Skeleton loader (dashboard) ===== */
+  .loading-banner {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 20px; font-size: 12px; color: var(--muted);
+    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .loading-banner .live-dot { width: 7px; height: 7px; }
+  .sk-card {
+    background: #fff; border: 1px solid var(--hair);
+    border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .sk-preview {
+    position: relative;
+    height: 260px; overflow: hidden;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--hair);
+    padding: 22px 24px;
+  }
+  .sk-chrome {
+    display: flex; justify-content: center; align-items: center; gap: 8px;
+    padding-bottom: 14px; border-bottom: 1px solid var(--hair);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+  .sk-chrome .live-dot { width: 8px; height: 8px; }
+  .sk-q {
+    margin: 18px 0 16px;
+    height: 14px; border-radius: 4px;
+    background: linear-gradient(90deg, #e6e0d5, #f0ebe0, #e6e0d5);
+    background-size: 200% 100%;
+    animation: sk-shimmer 1.6s ease-in-out infinite;
+  }
+  .sk-q.narrow { width: 62%; margin-left: auto; margin-right: auto; }
+  .sk-opts { display: flex; flex-direction: column; gap: 6px; }
+  .sk-opt {
+    height: 30px; border-radius: 4px;
+    background: linear-gradient(90deg, #ebe6dc, #f4efe5, #ebe6dc);
+    background-size: 200% 100%;
+    animation: sk-shimmer 1.6s ease-in-out infinite;
+  }
+  .sk-opt:nth-child(2) { animation-delay: .15s; }
+  .sk-opt:nth-child(3) { animation-delay: .30s; }
+  .sk-opt:nth-child(4) { animation-delay: .45s; }
+  .sk-meta { padding: 14px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .sk-row {
+    height: 10px; border-radius: 4px;
+    background: linear-gradient(90deg, #eee8dc, #f6f1e5, #eee8dc);
+    background-size: 200% 100%;
+    animation: sk-shimmer 1.6s ease-in-out infinite;
+  }
+  .sk-row.pill { width: 62px; height: 16px; border-radius: 999px; }
+  .sk-row.pill.second { width: 94px; }
+  .sk-pill-row { display: flex; gap: 6px; }
+  .sk-row.title { height: 14px; width: 86%; }
+  .sk-row.title2 { height: 14px; width: 58%; }
+  .sk-stats-row { display: flex; gap: 18px; padding: 2px 0; }
+  .sk-stat { flex: 0 0 auto; }
+  .sk-stat .sk-row { width: 44px; margin-bottom: 4px; }
+  .sk-stat .sk-row.sm { width: 62px; height: 8px; }
+  .sk-actions { display: flex; gap: 6px; padding-top: 10px; border-top: 1px solid var(--hair-2); }
+  .sk-btn {
+    height: 30px; border-radius: 6px; flex: 0 0 auto;
+    background: linear-gradient(90deg, #ece7dc, #f7f3e9, #ece7dc);
+    background-size: 200% 100%;
+    animation: sk-shimmer 1.6s ease-in-out infinite;
+  }
+  .sk-btn.primary { width: 78px; background: linear-gradient(90deg, #ffc0a3, #ffd8c0, #ffc0a3); background-size: 200% 100%; }
+  .sk-btn.w-sm { width: 52px; }
+  .sk-btn.w-md { width: 70px; }
+
+  @keyframes sk-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ===== Boot splash (shown before auth check resolves) ===== */
+  .boot-splash {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; z-index: 10;
+  }
+  .boot-mark {
+    font-size: 40px; color: var(--accent); line-height: 1;
+    animation: boot-mark 1.4s ease-in-out infinite;
+  }
+  @keyframes boot-mark {
+    0%,100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.88); opacity: 0.5; }
+  }
+  .boot-text {
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .boot-text .live-dot { width: 8px; height: 8px; }
+
   /* ===== Editor view (full card) ===== */
   .editor-card {
     background: #fff; border: 1px solid var(--hair); border-radius: 12px;
@@ -436,6 +533,12 @@
   <main class="admin-main" id="app-main"></main>
 </div>
 
+<!-- Boot splash (visible until auth check + first render resolves) -->
+<div id="boot-splash" class="boot-splash">
+  <div class="boot-mark">◆</div>
+  <div class="boot-text"><span class="live-dot"></span>Loading OpinaryCommerce</div>
+</div>
+
 <!-- Portals -->
 <div id="modal-host"></div>
 <div id="drawer-host"></div>
@@ -459,14 +562,62 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
+function dismissSplash() { $('boot-splash')?.remove(); }
+
 function showLogin() {
+  dismissSplash();
   $('login-view').classList.remove('hidden');
   $('app-shell').classList.add('hidden');
   setTimeout(() => $('pw')?.focus(), 10);
 }
 function showApp() {
+  dismissSplash();
   $('login-view').classList.add('hidden');
   $('app-shell').classList.remove('hidden');
+}
+
+function skeletonCard() {
+  return `
+    <div class="sk-card" aria-hidden="true">
+      <div class="sk-preview">
+        <div class="sk-chrome">LIVE POLL <span class="live-dot"></span> LOADING</div>
+        <div class="sk-q"></div>
+        <div class="sk-q narrow"></div>
+        <div class="sk-opts">
+          <div class="sk-opt"></div>
+          <div class="sk-opt"></div>
+          <div class="sk-opt"></div>
+          <div class="sk-opt"></div>
+        </div>
+      </div>
+      <div class="sk-meta">
+        <div class="sk-pill-row"><div class="sk-row pill"></div><div class="sk-row pill second"></div></div>
+        <div class="sk-row title"></div>
+        <div class="sk-row title2"></div>
+        <div class="sk-stats-row">
+          <div class="sk-stat"><div class="sk-row"></div><div class="sk-row sm"></div></div>
+          <div class="sk-stat"><div class="sk-row"></div><div class="sk-row sm"></div></div>
+          <div class="sk-stat"><div class="sk-row"></div><div class="sk-row sm"></div></div>
+        </div>
+        <div class="sk-actions">
+          <div class="sk-btn primary"></div>
+          <div class="sk-btn w-sm"></div>
+          <div class="sk-btn w-md"></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function skeletonGrid(count = 6) {
+  const cards = Array.from({ length: count }, skeletonCard).join('');
+  return `
+    <div class="loading-banner" role="status" aria-live="polite">
+      <span class="live-dot"></span>
+      <span>Tallying your polls…</span>
+    </div>
+    <div class="poll-grid">${cards}</div>
+  `;
 }
 
 async function login() {
@@ -494,7 +645,7 @@ async function showList() {
       </div>
       <div><button class="btn-primary" onclick="showEditor(null)">+ New poll</button></div>
     </div>
-    <div id="polls-slot"><div class="empty">Loading polls…</div></div>
+    <div id="polls-slot">${skeletonGrid(6)}</div>
   `;
 
   try {
