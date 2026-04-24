@@ -8,106 +8,444 @@
   :root {
     --accent: #ff5a1f;
     --accent-soft: #ffe9df;
+    --accent-softer: #fff3ec;
     --ink: #111;
     --muted: #6a6a6a;
-    --hair: #e6e6e6;
-    --bg: #fafafa;
+    --muted-2: #8a8a8a;
+    --hair: #eae6df;
+    --hair-2: #f0ede7;
+    --bg: #faf8f5;
+    --bg-2: #f4f1eb;
     --card: #fff;
     --danger: #b00020;
+    --ok: #2e7d32;
+    --sidebar: #111;
+    --sidebar-ink: #f0ede7;
+    --sidebar-muted: #8a8a8a;
+    --sidebar-line: #2a2a2a;
+    --live-dot: #e53935;
   }
+
   * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
   body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg);
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
   }
-  header {
-    background: #fff;
+  .serif { font-family: "Playfair Display", Georgia, serif; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .hidden { display: none !important; }
+
+  /* ===== Login ===== */
+  .login-wrap { max-width: 360px; margin: 120px auto; padding: 0 16px; }
+  .login-card {
+    background: #fff; border: 1px solid var(--hair);
+    border-radius: 14px; padding: 28px 24px;
+  }
+  .login-card h1 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 28px; font-weight: 500; margin: 0 0 18px;
+    letter-spacing: -0.01em;
+  }
+  .login-card label { display: block; font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 6px; }
+  .login-card input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--hair);
+    border-radius: 8px; font: inherit; font-size: 14px;
+  }
+  .login-card input:focus { outline: none; border-color: var(--accent); }
+  .login-card .err { color: var(--danger); font-size: 12px; margin-top: 8px; min-height: 16px; }
+
+  /* ===== App shell ===== */
+  .admin-app { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    background: var(--sidebar); color: var(--sidebar-ink);
+    padding: 22px 14px;
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 6px 6px 22px;
+  }
+  .brand-mark { color: var(--accent); font-size: 20px; line-height: 1; }
+  .brand-title { font-weight: 700; font-size: 14px; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 11px; color: var(--sidebar-muted); margin-top: 2px; }
+  .nav-section { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 12px; border: none; background: transparent;
+    color: var(--sidebar-muted); border-radius: 6px; cursor: pointer;
+    font: inherit; font-size: 13.5px; font-weight: 500; text-align: left; width: 100%;
+    transition: background .12s, color .12s;
+  }
+  .nav-item:hover:not(.disabled) { color: var(--sidebar-ink); background: rgba(255,255,255,0.04); }
+  .nav-item.active { color: var(--sidebar-ink); background: rgba(255,255,255,0.06); }
+  .nav-item.active .nav-icon { color: var(--accent); }
+  .nav-item.disabled { cursor: not-allowed; opacity: 0.55; }
+  .nav-item.disabled::after {
+    content: "Soon"; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
+    font-weight: 700; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 999px;
+    margin-left: auto; color: var(--sidebar-muted);
+  }
+  .nav-icon { width: 18px; text-align: center; font-size: 13px; }
+  .sidebar-spacer { flex-grow: 1; }
+  .sidebar-foot {
+    display: flex; align-items: center; gap: 10px;
+    padding-top: 14px; border-top: 1px solid var(--sidebar-line);
+  }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 999px;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 12px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .sidebar-foot .name { font-size: 13px; font-weight: 600; color: var(--sidebar-ink); }
+  .sidebar-foot .role { font-size: 11px; color: var(--sidebar-muted); }
+  .sidebar-foot button.logout {
+    margin-left: auto;
+    background: transparent; border: 1px solid var(--sidebar-line); color: var(--sidebar-muted);
+    padding: 4px 8px; font-size: 11px; border-radius: 6px; cursor: pointer; font-family: inherit;
+  }
+  .sidebar-foot button.logout:hover { color: var(--sidebar-ink); border-color: var(--sidebar-ink); }
+
+  /* ===== Main ===== */
+  .admin-main { min-width: 0; padding: 28px 32px 48px; }
+  @media (max-width: 900px) { .admin-main { padding: 20px 16px 32px; } }
+
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 24px; gap: 20px; flex-wrap: wrap;
+  }
+  .page-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 36px; line-height: 1; font-weight: 500;
+    margin: 0 0 4px; letter-spacing: -0.015em;
+  }
+  .page-sub { color: var(--muted); font-size: 14px; }
+
+  /* ===== Buttons ===== */
+  .btn-primary {
+    background: var(--accent); color: #fff; border: none;
+    padding: 0 16px; height: 38px; border-radius: 8px;
+    font: inherit; font-size: 13.5px; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    transition: filter .12s;
+  }
+  .btn-primary:hover { filter: brightness(0.95); }
+  .btn-primary.sm { height: 30px; padding: 0 12px; font-size: 12.5px; border-radius: 6px; }
+  .btn-ghost {
+    background: #fff; border: 1px solid var(--hair);
+    padding: 0 14px; height: 38px; border-radius: 8px;
+    font: inherit; font-size: 13px; color: var(--ink); cursor: pointer;
+    transition: border-color .12s, background .12s;
+  }
+  .btn-ghost:hover { border-color: var(--ink); }
+  .btn-ghost.sm { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 6px; }
+  .btn-ghost.danger { color: var(--danger); }
+  .btn-ghost.danger:hover { border-color: var(--danger); }
+  .btn-close {
+    background: transparent; border: 1px solid var(--hair);
+    width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+    font-size: 14px; color: var(--muted); flex-shrink: 0;
+  }
+  .btn-close:hover { color: var(--ink); border-color: var(--ink); }
+
+  /* ===== Poll grid ===== */
+  .poll-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+  .poll-card {
+    background: #fff; border: 1px solid var(--hair);
+    border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column;
+    transition: border-color .12s, box-shadow .12s, transform .12s;
+  }
+  .poll-card:hover {
+    border-color: #cfcabe;
+    box-shadow: 0 8px 24px rgba(10,10,10,0.05);
+  }
+
+  .card-preview {
+    position: relative; height: 260px; overflow: hidden;
+    background: var(--bg-2); cursor: pointer;
     border-bottom: 1px solid var(--hair);
-    padding: 14px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
   }
-  header .brand { font-weight: 700; font-size: 16px; }
-  header .brand em { color: var(--accent); font-style: normal; }
-  header button { background: none; border: 1px solid var(--hair); padding: 6px 10px; border-radius: 6px; cursor: pointer; }
-  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
-  .card { background: var(--card); border: 1px solid var(--hair); border-radius: 8px; padding: 18px; margin-bottom: 18px; }
-  h2 { margin: 0 0 14px; font-size: 18px; }
-  h3 { margin: 18px 0 8px; font-size: 15px; }
-  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-  input[type=text], input[type=password], textarea, select {
-    width: 100%; padding: 8px 10px; border: 1px solid var(--hair); border-radius: 6px;
-    font-size: 14px; font-family: inherit;
+  .preview-scale {
+    position: absolute; top: 0; left: 0;
+    width: 500px; height: 600px;
+    transform: scale(0.58); transform-origin: top left;
+    pointer-events: none;
   }
-  textarea { min-height: 60px; resize: vertical; }
-  button.primary {
-    background: var(--accent); color: #fff; border: none; padding: 9px 14px;
-    border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;
+  .preview-scale iframe {
+    width: 500px; height: 600px; border: none; background: #fff;
   }
-  button.primary:hover { filter: brightness(0.95); }
-  button.secondary {
-    background: #fff; border: 1px solid var(--hair); padding: 8px 12px;
-    border-radius: 6px; cursor: pointer; font-size: 13px;
+  .preview-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(244,241,235,0) 40%, rgba(244,241,235,0.92) 92%);
+    display: flex; align-items: flex-end; justify-content: center;
+    padding: 16px;
+    opacity: 0; transition: opacity .14s;
   }
-  button.danger { color: var(--danger); border-color: #f3c7ce; background: #fff; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--hair); font-size: 13px; }
-  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .actions { display: flex; gap: 6px; justify-content: flex-end; }
-  .row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
-  .row input { flex-grow: 1; }
-  .muted { color: var(--muted); font-size: 12px; }
-  .pill { display: inline-block; background: var(--accent-soft); color: var(--accent);
-          font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
-  .pill.archived { background: #eee; color: var(--muted); }
+  .card-preview:hover .preview-overlay { opacity: 1; }
+  .hover-btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 9px 16px; border-radius: 999px; font: inherit;
+    font-size: 12.5px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  }
+
+  .card-meta { padding: 14px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .card-head { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    font-size: 10px; letter-spacing: 0.06em; font-weight: 700;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .pill-live { background: #fdecea; color: #c53030; }
+  .pill-archived { background: #eee; color: var(--muted); }
+  .pill-gen { background: #e8f1ff; color: #1d4ed8; }
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--live-dot);
+    animation: opinary-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes opinary-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .card-question {
+    font-size: 15px; font-weight: 600; line-height: 1.3;
+    letter-spacing: -0.005em; color: var(--ink);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .card-stats { display: flex; gap: 18px; padding: 2px 0; }
+  .card-stat-v { font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; display: block; }
+  .card-stat-l { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .card-actions {
+    display: flex; gap: 6px; padding-top: 10px; border-top: 1px solid var(--hair-2);
+    flex-wrap: wrap;
+  }
+
+  .empty {
+    background: #fff; border: 1px dashed var(--hair); border-radius: 14px;
+    padding: 60px 24px; text-align: center; color: var(--muted); font-size: 14px;
+  }
+
+  /* ===== Editor view (full card) ===== */
+  .editor-card {
+    background: #fff; border: 1px solid var(--hair); border-radius: 12px;
+    padding: 24px; max-width: 760px;
+  }
+  .editor-card h2 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 24px; font-weight: 500; margin: 0 0 18px; letter-spacing: -0.01em;
+  }
+  .f-label {
+    display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 600; margin: 14px 0 6px;
+  }
+  .f-hint { text-transform: none; letter-spacing: 0; color: var(--muted-2); font-weight: 400; }
+  .f-input, .f-textarea, .f-select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--hair);
+    border-radius: 8px; font: inherit; font-size: 14px; background: #fff;
+  }
+  .f-input:focus, .f-textarea:focus, .f-select:focus { outline: none; border-color: var(--accent); }
+  .f-textarea { min-height: 70px; resize: vertical; }
+  .f-opts { display: flex; flex-direction: column; gap: 6px; }
+  .f-opt-row { display: flex; align-items: center; gap: 8px; }
+  .f-opt-num {
+    width: 26px; height: 26px; background: var(--bg-2); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: var(--muted); flex-shrink: 0;
+  }
+  .f-opt-row .f-input { flex-grow: 1; }
+  .f-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .f-footer { display: flex; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--hair-2); }
+  .f-err { color: var(--danger); font-size: 12px; min-height: 16px; margin-top: 8px; }
   .embed-snippet {
-    background: #111; color: #e0e0e0; padding: 10px 12px; border-radius: 6px;
-    font-family: ui-monospace, Consolas, monospace; font-size: 12px; overflow-x: auto;
+    background: var(--ink); color: #e0e0e0; padding: 10px 12px; border-radius: 8px;
+    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace; font-size: 12px;
+    overflow-x: auto; word-break: break-all; white-space: pre-wrap;
   }
-  .rec-card {
-    border: 1px solid var(--hair); border-radius: 6px; padding: 12px 14px; margin-bottom: 10px; background: #fff;
+
+  /* ===== Modal (interactive preview) ===== */
+  .modal-root { position: fixed; inset: 0; z-index: 60; }
+  .modal-backdrop { position: absolute; inset: 0; background: rgba(16,16,16,0.72); animation: fade .16s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .ipv-shell {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(1120px, 96vw); height: min(860px, 92vh);
+    background: var(--bg-2); border-radius: 14px; overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+    animation: ipvIn .22s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  .rec-card .bridge-box {
-    background: var(--accent-soft); padding: 10px 12px; border-radius: 4px; font-size: 14px; line-height: 1.4;
-    font-family: Georgia, serif; margin-bottom: 10px;
+  @keyframes ipvIn { from { transform: translate(-50%, -48%) scale(0.98); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+  .ipv-head {
+    display: flex; justify-content: space-between; align-items: center; gap: 18px;
+    padding: 18px 22px; background: #fff; border-bottom: 1px solid var(--hair);
   }
-  .rec-card .rec-row { display: flex; gap: 10px; font-size: 12px; padding: 6px 0; border-top: 1px dashed var(--hair); }
-  .rec-card .rec-row strong { color: var(--ink); }
-  .login-wrap { max-width: 360px; margin: 80px auto; }
-  .error { color: var(--danger); font-size: 13px; margin-top: 8px; }
-  .hidden { display: none; }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ipv-eyebrow {
+    font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin-bottom: 4px;
+  }
+  .ipv-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 20px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.2;
+  }
+  .ipv-actions { display: flex; gap: 10px; align-items: center; }
+  .ipv-frame-wrap {
+    flex-grow: 1; overflow: auto;
+    background: #ece8e0; padding: 20px; display: flex; justify-content: center;
+  }
+  .ipv-frame { width: 540px; max-width: 100%; min-height: 100%; border: none; background: #fff; border-radius: 4px; }
+  .ipv-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 11px 22px; background: #fff; border-top: 1px solid var(--hair);
+    font-size: 12px; color: var(--muted);
+  }
+  .kbd {
+    font-size: 10px; background: var(--bg-2); border: 1px solid var(--hair);
+    padding: 2px 6px; border-radius: 4px; color: var(--muted-2);
+    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  }
+
+  /* ===== Drawer (rec editor) ===== */
+  .drawer-backdrop { position: absolute; inset: 0; background: rgba(10,10,10,0.4); animation: fade .16s ease; }
+  .drawer {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: min(620px, 96vw);
+    background: var(--bg); overflow-y: auto;
+    box-shadow: -20px 0 60px rgba(0,0,0,0.15);
+    animation: slideIn .22s cubic-bezier(0.2, 0.9, 0.3, 1);
+    display: flex; flex-direction: column;
+  }
+  @keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .drawer-head {
+    padding: 22px 24px 16px; background: #fff; border-bottom: 1px solid var(--hair);
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+    position: sticky; top: 0; z-index: 1;
+  }
+  .drawer-eyebrow {
+    font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin-bottom: 6px;
+  }
+  .drawer-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 22px; font-weight: 500; margin: 0 0 6px; letter-spacing: -0.01em; line-height: 1.2;
+  }
+  .drawer-meta { font-size: 12px; color: var(--muted); }
+  .drawer-body { padding: 18px 24px 24px; display: flex; flex-direction: column; gap: 18px; }
+
+  .opt-block {
+    background: #fff; border: 1px solid var(--hair); border-radius: 10px;
+    padding: 16px;
+  }
+  .opt-block-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; gap: 10px; }
+  .opt-label { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .locale-tabs { display: inline-flex; border: 1px solid var(--hair); border-radius: 7px; overflow: hidden; }
+  .locale-tabs button {
+    border: none; background: #fff; padding: 4px 10px; font: inherit; font-size: 11.5px;
+    color: var(--muted); cursor: pointer; border-right: 1px solid var(--hair);
+  }
+  .locale-tabs button:last-child { border-right: none; }
+  .locale-tabs button.active { background: var(--ink); color: #fff; }
+  .locale-pane { display: none; }
+  .locale-pane.active { display: block; }
+  .bridge-box {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 17px; line-height: 1.4; font-weight: 500;
+    padding: 14px 16px; background: var(--accent-softer);
+    border-left: 3px solid var(--accent); border-radius: 4px;
+    outline: none; min-height: 60px;
+  }
+  .bridge-box:focus { background: var(--accent-soft); }
+  .rec-cache { font-size: 11px; color: var(--muted); margin: 8px 0 10px; }
+  .rec-products { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .rec-prod-row { display: flex; gap: 10px; font-size: 12px; padding: 8px 0; border-top: 1px dashed var(--hair); align-items: flex-start; }
+  .rec-prod-row:first-child { border-top: none; padding-top: 0; }
+  .rec-badge {
+    background: var(--accent-softer); color: var(--accent);
+    font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 800;
+    padding: 3px 8px; border-radius: 999px; flex-shrink: 0; white-space: nowrap;
+  }
+  .rec-prod-body { min-width: 0; }
+  .rec-prod-title { font-weight: 700; color: var(--ink); font-size: 12.5px; }
+  .rec-prod-desc { color: var(--muted); margin-top: 2px; }
+  .rec-prod-query { color: var(--muted-2); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10.5px; margin-top: 3px; }
+  .rec-actions { display: flex; gap: 6px; margin-top: 12px; }
+  .rec-saved { color: var(--ok); font-size: 11px; font-weight: 600; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2); animation: toastIn .16s ease;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live-dot { animation: none; }
+    .ipv-shell, .drawer, .modal-backdrop, .drawer-backdrop, .toast { animation: none; }
+  }
 </style>
 </head>
 <body>
 
+<!-- Login -->
 <div id="login-view" class="login-wrap hidden">
-  <div class="card">
-    <h2>OpinaryCommerce admin</h2>
-    <label>Password</label>
+  <div class="login-card">
+    <h1>OpinaryCommerce</h1>
+    <label for="pw">Password</label>
     <input id="pw" type="password" autofocus>
-    <div style="margin-top: 12px;"><button class="primary" onclick="login()">Sign in</button></div>
-    <div id="login-error" class="error"></div>
+    <div style="margin-top: 14px;"><button class="btn-primary" onclick="login()">Sign in</button></div>
+    <div id="login-error" class="err"></div>
   </div>
 </div>
 
-<header id="app-header" class="hidden">
-  <div class="brand">OpinaryCommerce · <em>admin</em></div>
-  <div>
-    <button onclick="showList()">Polls</button>
-    <button onclick="showEditor(null)">+ New poll</button>
-  </div>
-</header>
+<!-- App shell -->
+<div id="app-shell" class="admin-app hidden">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <div>
+        <div class="brand-title">OpinaryCommerce</div>
+        <div class="brand-sub">Admin</div>
+      </div>
+    </div>
+    <nav class="nav-section">
+      <button class="nav-item active" onclick="showList()"><span class="nav-icon">◨</span><span>Polls</span></button>
+      <button class="nav-item disabled" tabindex="-1" aria-disabled="true"><span class="nav-icon">▲</span><span>Analytics</span></button>
+      <button class="nav-item disabled" tabindex="-1" aria-disabled="true"><span class="nav-icon">↗</span><span>Affiliate links</span></button>
+      <button class="nav-item disabled" tabindex="-1" aria-disabled="true"><span class="nav-icon">⚙</span><span>Settings</span></button>
+    </nav>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-foot">
+      <div class="avatar">OC</div>
+      <div style="min-width: 0; flex-grow: 1;">
+        <div class="name">Commerce</div>
+        <div class="role">Admin session</div>
+      </div>
+      <button class="logout" onclick="logout()">Sign out</button>
+    </div>
+  </aside>
+  <main class="admin-main" id="app-main"></main>
+</div>
 
-<main id="app-main" class="hidden"></main>
+<!-- Portals -->
+<div id="modal-host"></div>
+<div id="drawer-host"></div>
+<div id="toast-host"></div>
 
 <script>
 const $ = id => document.getElementById(id);
-let STATE = { view: 'login', polls: [], current: null };
+const STATE = { polls: [], editingOpts: [], drawer: null, drawerPollId: null };
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -116,148 +454,356 @@ async function api(path, opts = {}) {
     ...opts,
   });
   if (res.status === 401) { showLogin(); throw new Error('unauthorized'); }
-  if (!res.ok) { let t = await res.text(); throw new Error(t || res.statusText); }
+  if (!res.ok) { throw new Error(await res.text() || res.statusText); }
+  if (res.status === 204) return null;
   return res.json();
 }
 
-function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
 function showLogin() {
   $('login-view').classList.remove('hidden');
-  $('app-header').classList.add('hidden');
-  $('app-main').classList.add('hidden');
+  $('app-shell').classList.add('hidden');
+  setTimeout(() => $('pw')?.focus(), 10);
 }
 function showApp() {
   $('login-view').classList.add('hidden');
-  $('app-header').classList.remove('hidden');
-  $('app-main').classList.remove('hidden');
+  $('app-shell').classList.remove('hidden');
 }
 
 async function login() {
   const pw = $('pw').value;
   try {
     await api('/admin/api/auth', { method: 'POST', body: JSON.stringify({ password: pw }) });
+    $('login-error').textContent = '';
     showApp(); showList();
   } catch (e) { $('login-error').textContent = 'Invalid password.'; }
 }
 
+function logout() {
+  document.cookie = 'admin_token=; Max-Age=0; path=/; samesite=strict';
+  showLogin();
+}
+
+/* ===== Polls list view ===== */
 async function showList() {
   showApp();
+  $('app-main').innerHTML = `
+    <div class="topbar">
+      <div>
+        <h1 class="page-title">Polls</h1>
+        <div class="page-sub">Live commerce polls embedded across your articles.</div>
+      </div>
+      <div><button class="btn-primary" onclick="showEditor(null)">+ New poll</button></div>
+    </div>
+    <div id="polls-slot"><div class="empty">Loading polls…</div></div>
+  `;
+
   try {
     const { polls } = await api('/admin/api/polls');
     STATE.polls = polls;
-    $('app-main').innerHTML = `
-      <div class="card">
-        <h2>Polls (${polls.length})</h2>
-        ${polls.length === 0 ? '<div class="muted">No polls yet. Click "+ New poll" to create one.</div>' : `
-          <table>
-            <thead><tr><th>Question</th><th>Status</th><th>Votes</th><th>Options</th><th></th></tr></thead>
-            <tbody>
-              ${polls.map(p => `
-                <tr>
-                  <td><strong>${esc(p.question)}</strong><div class="muted" style="margin-top:2px">${esc(p.id)}</div></td>
-                  <td><span class="pill ${p.status === 'archived' ? 'archived' : ''}">${esc(p.status)}</span></td>
-                  <td>${p.vote_count}</td>
-                  <td>${(p.options || []).length}</td>
-                  <td class="actions">
-                    <button class="primary" onclick="window.open('/static/demo.html?id=${esc(p.id)}', '_blank')">Preview</button>
-                    <button class="secondary" onclick="showEditor('${esc(p.id)}')">Edit</button>
-                    <button class="secondary" onclick="showRecs('${esc(p.id)}')">Recs</button>
-                    <button class="danger" onclick="deletePoll('${esc(p.id)}')">Delete</button>
-                  </td>
-                </tr>`).join('')}
-            </tbody>
-          </table>`}
-      </div>
-    `;
-  } catch (e) { console.error(e); }
+    $('polls-slot').innerHTML = polls.length === 0
+      ? `<div class="empty">No polls yet. Click "+ New poll" to create one.</div>`
+      : `<div class="poll-grid">${polls.map(renderCard).join('')}</div>`;
+  } catch (e) { /* 401 already handled by api() */ }
 }
 
+function renderCard(p) {
+  const isActive = p.status === 'active';
+  const statusPill = isActive
+    ? `<span class="pill pill-live"><span class="live-dot"></span>LIVE</span>`
+    : `<span class="pill pill-archived">ARCHIVED</span>`;
+  const hasBridge = (p.rec_count || 0) > 0;
+  const bridgePill = hasBridge ? `<span class="pill pill-gen">✦ BRIDGE READY</span>` : '';
+
+  // Live iframe thumbnail of the real widget. scale(0.58) fits 500px → ~290px.
+  // Only render for active polls; archived polls get a muted placeholder.
+  const preview = isActive
+    ? `<div class="preview-scale"><iframe src="/widget/${esc(p.id)}" scrolling="no" loading="lazy" aria-hidden="true" tabindex="-1"></iframe></div>`
+    : `<div style="padding: 40px 20px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.6;">Preview disabled<br>while archived</div>`;
+
+  return `
+    <div class="poll-card" data-id="${esc(p.id)}">
+      <div class="card-preview" onclick="openPreview('${esc(p.id)}')" title="Preview interactive">
+        ${preview}
+        <div class="preview-overlay"><button class="hover-btn"><span>▶</span> Preview interactive</button></div>
+      </div>
+      <div class="card-meta">
+        <div class="card-head">${statusPill}${bridgePill}</div>
+        <div class="card-question">${esc(p.question)}</div>
+        <div class="card-stats">
+          <div><span class="card-stat-v">${(p.vote_count || 0).toLocaleString()}</span><span class="card-stat-l">votes</span></div>
+          <div><span class="card-stat-v">${(p.options || []).length}</span><span class="card-stat-l">options</span></div>
+          <div><span class="card-stat-v">${p.rec_count || 0}</span><span class="card-stat-l">cached recs</span></div>
+        </div>
+        <div class="card-actions">
+          <button class="btn-primary sm" onclick="openPreview('${esc(p.id)}')">▶ Preview</button>
+          <button class="btn-ghost sm" onclick="showEditor('${esc(p.id)}')">Edit</button>
+          <button class="btn-ghost sm" onclick="openRecsDrawer('${esc(p.id)}')">Recs</button>
+          <button class="btn-ghost sm" onclick="copyEmbed('${esc(p.id)}')" title="Copy embed snippet">⧉ Embed</button>
+          <button class="btn-ghost sm danger" onclick="deletePoll('${esc(p.id)}')" title="Delete poll">Delete</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ===== Interactive preview modal ===== */
+let previewEscHandler = null;
+function openPreview(pollId) {
+  const poll = STATE.polls.find(p => p.id === pollId);
+  if (!poll) return;
+  const host = $('modal-host');
+  host.innerHTML = `
+    <div class="modal-root">
+      <div class="modal-backdrop" onclick="closePreview()"></div>
+      <div class="ipv-shell" role="dialog" aria-modal="true">
+        <div class="ipv-head">
+          <div>
+            <div class="ipv-eyebrow">Interactive preview · ${esc(poll.publisher_name || 'Article embed')}</div>
+            <div class="ipv-title">${esc(poll.question)}</div>
+          </div>
+          <div class="ipv-actions">
+            <button class="btn-ghost" onclick="window.open('/widget/${esc(poll.id)}', '_blank')">Open in new tab ↗</button>
+            <button class="btn-close" onclick="closePreview()" aria-label="Close">✕</button>
+          </div>
+        </div>
+        <div class="ipv-frame-wrap">
+          <iframe class="ipv-frame" src="/widget/${esc(poll.id)}" title="Widget preview"></iframe>
+        </div>
+        <div class="ipv-foot">
+          <span>Click an option in the widget to see the vote→results animation, bridge reveal, and product CTAs as a reader would.</span>
+          <span>Press <span class="kbd">Esc</span> to close</span>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.style.overflow = 'hidden';
+  previewEscHandler = (e) => { if (e.key === 'Escape') closePreview(); };
+  window.addEventListener('keydown', previewEscHandler);
+}
+function closePreview() {
+  $('modal-host').innerHTML = '';
+  document.body.style.overflow = '';
+  if (previewEscHandler) { window.removeEventListener('keydown', previewEscHandler); previewEscHandler = null; }
+}
+
+/* ===== Rec editor drawer ===== */
+let drawerEscHandler = null;
+async function openRecsDrawer(pollId) {
+  const poll = STATE.polls.find(p => p.id === pollId);
+  if (!poll) return;
+  STATE.drawerPollId = pollId;
+  const host = $('drawer-host');
+  host.innerHTML = `
+    <div class="modal-root">
+      <div class="drawer-backdrop" onclick="closeRecsDrawer()"></div>
+      <div class="drawer" role="dialog" aria-modal="true">
+        <div class="drawer-head">
+          <div style="min-width:0">
+            <div class="drawer-eyebrow">Recommendations</div>
+            <div class="drawer-title">${esc(poll.question)}</div>
+            <div class="drawer-meta">Cached per (option, locale). First voter triggers generation; the cache serves everyone after.</div>
+          </div>
+          <button class="btn-close" onclick="closeRecsDrawer()" aria-label="Close">✕</button>
+        </div>
+        <div class="drawer-body" id="drawer-body"><div class="empty">Loading recommendations…</div></div>
+      </div>
+    </div>
+  `;
+  document.body.style.overflow = 'hidden';
+  drawerEscHandler = (e) => { if (e.key === 'Escape') closeRecsDrawer(); };
+  window.addEventListener('keydown', drawerEscHandler);
+  await loadRecs(pollId);
+}
+
+function closeRecsDrawer() {
+  $('drawer-host').innerHTML = '';
+  document.body.style.overflow = '';
+  if (drawerEscHandler) { window.removeEventListener('keydown', drawerEscHandler); drawerEscHandler = null; }
+  STATE.drawerPollId = null;
+}
+
+async function loadRecs(pollId) {
+  try {
+    const { options, recommendations } = await api(`/admin/api/polls/${encodeURIComponent(pollId)}/recommendations`);
+    const byKey = {};
+    for (const r of recommendations) byKey[`${r.option_id}|${r.locale}`] = r;
+    $('drawer-body').innerHTML = options.map(o => renderOptBlock(o, byKey)).join('');
+  } catch (e) {
+    $('drawer-body').innerHTML = `<div class="empty">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderOptBlock(o, byKey) {
+  return `
+    <div class="opt-block" data-option="${esc(o.id)}">
+      <div class="opt-block-head">
+        <div class="opt-label">${esc(o.label)}</div>
+        <div class="locale-tabs" role="tablist">
+          <button class="active" onclick="switchLocale(this, '${esc(o.id)}', 'en')">EN</button>
+          <button onclick="switchLocale(this, '${esc(o.id)}', 'de')">DE</button>
+        </div>
+      </div>
+      ${['en', 'de'].map((loc, i) => renderLocalePane(o, loc, byKey[`${o.id}|${loc}`], i === 0)).join('')}
+    </div>
+  `;
+}
+
+function renderLocalePane(o, loc, rec, active) {
+  const id = `bridge-${o.id}-${loc}`;
+  if (!rec) {
+    return `
+      <div class="locale-pane ${active ? 'active' : ''}" data-loc="${loc}">
+        <div class="rec-cache">No cached ${loc.toUpperCase()} recommendations yet.</div>
+        <button class="btn-primary sm" onclick="regenerate('${esc(o.id)}', '${loc}')">Generate now</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="locale-pane ${active ? 'active' : ''}" data-loc="${loc}">
+      <div class="rec-cache">Cached · generated ${new Date(rec.generated_at).toLocaleString()}</div>
+      <div class="bridge-box" contenteditable="true" id="${id}">${esc(rec.bridge)}</div>
+      <div class="rec-actions">
+        <button class="btn-ghost sm" onclick="saveBridge('${esc(o.id)}', '${loc}')">Save bridge</button>
+        <button class="btn-primary sm" onclick="regenerate('${esc(o.id)}', '${loc}')">Regenerate</button>
+      </div>
+      <div class="rec-products">
+        ${(rec.products || []).map(p => `
+          <div class="rec-prod-row">
+            <span class="rec-badge">${esc(p.badge)}</span>
+            <div class="rec-prod-body">
+              <div class="rec-prod-title">${esc(p.title)}</div>
+              <div class="rec-prod-desc">${esc(p.description)}</div>
+              <div class="rec-prod-query">${esc(p.query)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function switchLocale(btn, optionId, loc) {
+  const block = btn.closest('.opt-block');
+  block.querySelectorAll('.locale-tabs button').forEach(b => b.classList.toggle('active', b === btn));
+  block.querySelectorAll('.locale-pane').forEach(p => p.classList.toggle('active', p.dataset.loc === loc));
+}
+
+async function regenerate(optionId, loc) {
+  if (!confirm(`Regenerate ${loc.toUpperCase()} recommendations? This calls Claude and overwrites the cache.`)) return;
+  try {
+    await api(`/admin/api/options/${encodeURIComponent(optionId)}/regenerate-recs`, {
+      method: 'POST', body: JSON.stringify({ locale: loc }),
+    });
+    toast(`Regenerated ${loc.toUpperCase()} recommendations`);
+    if (STATE.drawerPollId) await loadRecs(STATE.drawerPollId);
+  } catch (e) { toast(`Regenerate failed: ${e.message}`); }
+}
+
+async function saveBridge(optionId, loc) {
+  const el = document.getElementById(`bridge-${optionId}-${loc}`);
+  if (!el) return;
+  const bridge = el.textContent.trim();
+  if (!bridge) { toast('Bridge cannot be empty'); return; }
+  try {
+    await api(`/admin/api/options/${encodeURIComponent(optionId)}/recommendations/bridge`, {
+      method: 'PATCH', body: JSON.stringify({ locale: loc, bridge }),
+    });
+    toast('Bridge saved');
+  } catch (e) { toast(`Save failed: ${e.message}`); }
+}
+
+/* ===== Editor (create / edit poll) ===== */
 function showEditor(pollId) {
   showApp();
   const poll = pollId ? STATE.polls.find(p => p.id === pollId) : null;
-  const opts = poll ? poll.options : [{ label: '' }, { label: '' }];
+  STATE.editingOpts = poll ? poll.options.map(o => ({ label: o.label })) : [{ label: '' }, { label: '' }];
+
   $('app-main').innerHTML = `
-    <div class="card">
-      <h2>${poll ? 'Edit poll' : 'New poll'}</h2>
-      <label>Question</label>
-      <textarea id="q">${esc(poll ? poll.question : '')}</textarea>
-      <h3>Options (2–4)</h3>
-      <div id="opts"></div>
-      <button class="secondary" onclick="addOpt()" id="addOptBtn">+ Add option</button>
-      <h3>Admin context notes (optional)</h3>
-      <div class="muted" style="margin-bottom: 6px;">Passed to Claude when generating recommendations. Helps steer towards the product category.</div>
-      <textarea id="notes">${esc(poll ? (poll.context_notes || '') : '')}</textarea>
-      <h3>Publisher branding (optional)</h3>
-      <div class="grid-2">
-        <div>
-          <label>Publisher name</label>
-          <input type="text" id="pub_name" value="${esc(poll ? (poll.publisher_name || '') : '')}">
-        </div>
-        <div>
-          <label>Publisher logo URL</label>
-          <input type="text" id="pub_logo" value="${esc(poll ? (poll.publisher_logo || '') : '')}">
-        </div>
+    <div class="topbar">
+      <div>
+        <h1 class="page-title">${poll ? 'Edit poll' : 'New poll'}</h1>
+        <div class="page-sub">${poll ? 'Updates publish immediately.' : 'Create a new poll. Add 2–4 options.'}</div>
       </div>
+      <div><button class="btn-ghost" onclick="showList()">← Back to polls</button></div>
+    </div>
+
+    <div class="editor-card">
+      <label class="f-label" for="q">Question</label>
+      <textarea id="q" class="f-input f-textarea">${esc(poll ? poll.question : '')}</textarea>
+
+      <label class="f-label">Options <span class="f-hint">(2–4)</span></label>
+      <div class="f-opts" id="opts"></div>
+      <button class="btn-ghost sm" onclick="addOpt()" id="addOptBtn" style="margin-top: 6px;">+ Add option</button>
+
+      <label class="f-label" for="notes">Admin context notes <span class="f-hint">(passed to Claude when generating recommendations)</span></label>
+      <textarea id="notes" class="f-input f-textarea">${esc(poll ? (poll.context_notes || '') : '')}</textarea>
+
+      <label class="f-label">Publisher branding <span class="f-hint">(optional)</span></label>
+      <div class="f-grid-2">
+        <input id="pub_name" type="text" class="f-input" placeholder="Publisher name" value="${esc(poll ? (poll.publisher_name || '') : '')}">
+        <input id="pub_logo" type="text" class="f-input" placeholder="Publisher logo URL" value="${esc(poll ? (poll.publisher_logo || '') : '')}">
+      </div>
+
       ${poll ? `
-        <h3>Status</h3>
-        <select id="status">
+        <label class="f-label" for="status">Status</label>
+        <select id="status" class="f-input f-select">
           <option value="active" ${poll.status === 'active' ? 'selected' : ''}>active</option>
           <option value="archived" ${poll.status === 'archived' ? 'selected' : ''}>archived</option>
-        </select>` : ''}
-      <div style="margin-top: 18px; display: flex; gap: 10px;">
-        <button class="primary" onclick="savePoll(${poll ? `'${esc(poll.id)}'` : 'null'})">Save</button>
-        <button class="secondary" onclick="showList()">Cancel</button>
+        </select>
+      ` : ''}
+
+      <div class="f-footer">
+        <button class="btn-primary" onclick="savePoll(${poll ? `'${esc(poll.id)}'` : 'null'})">Save</button>
+        <button class="btn-ghost" onclick="showList()">Cancel</button>
       </div>
-      <div id="save-error" class="error"></div>
+      <div id="save-error" class="f-err"></div>
+
       ${poll ? `
-        <h3 style="margin-top: 28px;">Preview</h3>
-        <button class="primary" onclick="window.open('/static/demo.html?id=${esc(poll.id)}', '_blank')">Open preview in new tab →</button>
-        <h3 style="margin-top: 28px;">Embed snippet</h3>
+        <label class="f-label">Embed snippet</label>
         <div class="embed-snippet">&lt;script src="${location.origin}/embed.js" data-poll-id="${esc(poll.id)}"&gt;&lt;/script&gt;</div>
+        <div class="f-footer" style="border-top:none;padding-top:4px;margin-top:4px;">
+          <button class="btn-ghost sm" onclick="copyEmbed('${esc(poll.id)}')">⧉ Copy embed</button>
+          <button class="btn-ghost sm" onclick="window.open('/widget/${esc(poll.id)}', '_blank')">Open widget ↗</button>
+        </div>
       ` : ''}
     </div>
   `;
-  renderOpts(opts);
+  renderOpts();
 }
 
-function renderOpts(opts) {
-  const html = opts.map((o, i) => `
-    <div class="row" data-i="${i}">
-      <input type="text" value="${esc(o.label || '')}" placeholder="Option ${i + 1} label">
-      <button class="secondary" onclick="removeOpt(${i})">×</button>
-    </div>`).join('');
-  $('opts').innerHTML = html;
-  $('addOptBtn').disabled = opts.length >= 4;
-  STATE.editOpts = opts;
+function renderOpts() {
+  $('opts').innerHTML = STATE.editingOpts.map((o, i) => `
+    <div class="f-opt-row">
+      <div class="f-opt-num">${i + 1}</div>
+      <input type="text" class="f-input" value="${esc(o.label || '')}" placeholder="Option ${i + 1} label" oninput="STATE.editingOpts[${i}].label = this.value">
+      <button class="btn-ghost sm" onclick="removeOpt(${i})" ${STATE.editingOpts.length <= 2 ? 'disabled style="opacity:0.4"' : ''}>×</button>
+    </div>
+  `).join('');
+  $('addOptBtn').disabled = STATE.editingOpts.length >= 4;
 }
 
 function addOpt() {
-  const current = collectOpts();
-  if (current.length >= 4) return;
-  renderOpts([...current, { label: '' }]);
+  if (STATE.editingOpts.length >= 4) return;
+  STATE.editingOpts.push({ label: '' });
+  renderOpts();
 }
 function removeOpt(i) {
-  const current = collectOpts();
-  if (current.length <= 2) return;
-  current.splice(i, 1);
-  renderOpts(current);
-}
-function collectOpts() {
-  return Array.from(document.querySelectorAll('#opts .row input')).map(el => ({ label: el.value }));
+  if (STATE.editingOpts.length <= 2) return;
+  STATE.editingOpts.splice(i, 1);
+  renderOpts();
 }
 
 async function savePoll(pollId) {
   const body = {
     question: $('q').value.trim(),
-    options: collectOpts().filter(o => o.label.trim()).map(o => ({ label: o.label.trim() })),
+    options: STATE.editingOpts.map(o => ({ label: (o.label || '').trim() })).filter(o => o.label),
     context_notes: $('notes').value.trim() || null,
     publisher_name: $('pub_name').value.trim() || null,
     publisher_logo: $('pub_logo').value.trim() || null,
   };
   if ($('status')) body.status = $('status').value;
   if (!body.question || body.options.length < 2) {
-    $('save-error').textContent = 'Need a question and at least 2 options.';
+    $('save-error').textContent = 'Need a question and at least 2 non-empty options.';
     return;
   }
   try {
@@ -266,79 +812,41 @@ async function savePoll(pollId) {
     } else {
       await api('/admin/api/polls', { method: 'POST', body: JSON.stringify(body) });
     }
+    toast(pollId ? 'Poll updated' : 'Poll created');
     showList();
   } catch (e) { $('save-error').textContent = 'Save failed: ' + e.message; }
 }
 
 async function deletePoll(pollId) {
-  if (!confirm('Delete this poll and all its votes/recs?')) return;
-  await api(`/admin/api/polls/${encodeURIComponent(pollId)}`, { method: 'DELETE' });
-  showList();
-}
-
-async function showRecs(pollId) {
-  showApp();
-  const { options, recommendations } = await api(`/admin/api/polls/${encodeURIComponent(pollId)}/recommendations`);
-  const byKey = {};
-  for (const r of recommendations) byKey[`${r.option_id}|${r.locale}`] = r;
-
-  $('app-main').innerHTML = `
-    <div class="card">
-      <h2>Recommendations</h2>
-      <div class="muted" style="margin-bottom: 14px;">Cached per (option, locale). First voter on an option+locale triggers generation; the cache serves everyone after. Edit the bridge inline, or regenerate the whole payload.</div>
-      ${options.map(o => `
-        <h3>${esc(o.label)}</h3>
-        ${['en', 'de'].map(loc => {
-          const key = `${o.id}|${loc}`;
-          const rec = byKey[key];
-          return `<div class="rec-card">
-            <div class="muted" style="margin-bottom: 6px;">Locale: <strong>${loc}</strong> ${rec ? `· generated ${new Date(rec.generated_at).toLocaleString()}` : '· <em>not generated yet</em>'}</div>
-            ${rec ? `
-              <div class="bridge-box" contenteditable="true" id="bridge-${esc(o.id)}-${loc}">${esc(rec.bridge)}</div>
-              ${(rec.products || []).map(p => `
-                <div class="rec-row">
-                  <span class="pill">${esc(p.badge)}</span>
-                  <div><strong>${esc(p.title)}</strong> — ${esc(p.description)} <span class="muted">[${esc(p.query)}]</span></div>
-                </div>`).join('')}
-              <div style="margin-top: 10px; display: flex; gap: 8px;">
-                <button class="secondary" onclick="saveBridge('${esc(o.id)}', '${loc}')">Save bridge edit</button>
-                <button class="primary" onclick="regenerate('${esc(o.id)}', '${loc}')">Regenerate</button>
-              </div>` : `
-              <button class="primary" onclick="regenerate('${esc(o.id)}', '${loc}')">Generate now</button>`}
-          </div>`;
-        }).join('')}
-      `).join('')}
-      <div style="margin-top: 14px;"><button class="secondary" onclick="showList()">Back to polls</button></div>
-    </div>
-  `;
-  STATE.currentPollId = pollId;
-}
-
-async function regenerate(optionId, locale) {
-  if (!confirm(`Regenerate ${locale} recommendations? This will call Claude and overwrite the cache.`)) return;
+  const poll = STATE.polls.find(p => p.id === pollId);
+  if (!confirm(`Delete "${poll?.question || 'this poll'}"?\nAll votes and cached recommendations will be removed.`)) return;
   try {
-    await api(`/admin/api/options/${encodeURIComponent(optionId)}/regenerate-recs`, {
-      method: 'POST', body: JSON.stringify({ locale }),
-    });
-    showRecs(STATE.currentPollId);
-  } catch (e) { alert('Regenerate failed: ' + e.message); }
+    await api(`/admin/api/polls/${encodeURIComponent(pollId)}`, { method: 'DELETE' });
+    toast('Poll deleted');
+    showList();
+  } catch (e) { toast('Delete failed: ' + e.message); }
 }
 
-async function saveBridge(optionId, locale) {
-  const el = document.getElementById(`bridge-${optionId}-${locale}`);
-  if (!el) return;
-  const bridge = el.textContent.trim();
-  if (!bridge) return;
-  try {
-    await api(`/admin/api/options/${encodeURIComponent(optionId)}/recommendations/bridge`, {
-      method: 'PATCH', body: JSON.stringify({ locale, bridge }),
-    });
-    el.style.outline = '2px solid #4caf50';
-    setTimeout(() => { el.style.outline = ''; }, 800);
-  } catch (e) { alert('Save failed: ' + e.message); }
+function copyEmbed(pollId) {
+  const snippet = `<script src="${location.origin}/embed.js" data-poll-id="${pollId}"></${'script'}>`;
+  navigator.clipboard?.writeText(snippet).then(
+    () => toast('Embed snippet copied'),
+    () => toast('Copy failed — clipboard not available')
+  );
 }
 
-// Try to load list on boot; fall back to login on 401.
+function toast(msg) {
+  const host = $('toast-host');
+  host.innerHTML = `<div class="toast">${esc(msg)}</div>`;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { host.innerHTML = ''; }, 2200);
+}
+
+/* ===== Boot ===== */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.activeElement === $('pw')) login();
+});
+
 (async function boot() {
   try { await api('/admin/api/polls'); showApp(); showList(); }
   catch (e) { showLogin(); }

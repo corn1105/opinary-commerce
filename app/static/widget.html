@@ -57,7 +57,9 @@
     border-radius: 50%;
     margin: 0 6px;
     vertical-align: middle;
+    animation: opinary-pulse 1.6s ease-in-out infinite;
   }
+  @keyframes opinary-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
   .chrome .votes { color: var(--ink); }
 
   /* Question */
@@ -143,6 +145,7 @@
     background: #cfcfcf;
     border-radius: 2px;
     width: 0;
+    transition: width 0.6s ease;
   }
 
   .opt-res.chosen {
@@ -180,15 +183,36 @@
     margin-left: 4px;
   }
 
-  /* Bridge */
+  /* Bridge — hero treatment (dark block with orange eyebrow) */
   .bridge {
-    margin: 28px 6px 22px;
+    position: relative;
+    margin: 28px -4px 22px;
+    padding: 22px 20px;
+    background: #111;
+    color: #fff;
+    border-radius: 6px;
     font-family: "Playfair Display", Georgia, "Times New Roman", serif;
-    font-size: 19px;
+    font-size: 22px;
     line-height: 1.35;
-    text-align: center;
-    color: var(--ink);
     font-weight: 500;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.6s ease 0.3s, transform 0.6s ease 0.3s;
+  }
+  .bridge::before {
+    content: "BASED ON YOUR VOTE";
+    display: block;
+    color: var(--accent);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .bridge.in { opacity: 1; transform: translateY(0); }
+  @media (max-width: 480px) {
+    .bridge { margin: 24px 0 20px; padding: 18px 16px; font-size: 20px; }
   }
 
   /* Product cards */
@@ -344,6 +368,14 @@
     color: var(--ink);
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .chrome .dot { animation: none; }
+    .opt-res .bar-fill,
+    .opt-res.chosen::before,
+    .bridge { transition: none; }
+    .bridge { opacity: 1; transform: none; }
+  }
+
   .loading, .error {
     text-align: center;
     padding: 30px 10px;
@@ -422,17 +454,18 @@
       const pct = total ? Math.round((r.count / total) * 100) : 0;
       const isViewing = r.option_id === viewingOptionId;
       if (isViewing) {
-        return `<div class="opt-res chosen" style="--pct:${pct}%" data-oid="${esc(r.option_id)}">
+        // `--pct` starts at 0%; JS sets the target on rAF so the underlay animates.
+        return `<div class="opt-res chosen" style="--pct:0%" data-oid="${esc(r.option_id)}" data-pct="${pct}">
           <span class="label">${esc(r.label)}</span>
           <span class="pct">${pct}%</span>
           <span class="check">✓</span>
         </div>`;
       }
       const barPct = total ? Math.max(4, (r.count / total) * 100) : 0;
-      return `<div class="opt-res" data-oid="${esc(r.option_id)}">
+      return `<div class="opt-res" data-oid="${esc(r.option_id)}" data-bar="${barPct}">
         <span class="label">${esc(r.label)}</span>
         <span class="pct">${pct}%</span>
-        <span class="bar-fill" style="width:${barPct}%"></span>
+        <span class="bar-fill" style="width:0%"></span>
       </div>`;
     }).join('');
 
@@ -513,6 +546,21 @@
           renderResults(lastPoll, lastData);
         }
       });
+    });
+
+    // Sequential reveal: bars animate 0 → pct (600ms), bridge fades in 300ms after.
+    requestAnimationFrame(() => {
+      root.querySelectorAll('.opt-res').forEach(el => {
+        if (el.classList.contains('chosen')) {
+          const pct = Number(el.dataset.pct || 0);
+          el.style.setProperty('--pct', pct + '%');
+        } else {
+          const bar = el.querySelector('.bar-fill');
+          if (bar) bar.style.width = (el.dataset.bar || 0) + '%';
+        }
+      });
+      const bridge = root.querySelector('.bridge');
+      if (bridge) setTimeout(() => bridge.classList.add('in'), 550);
     });
     const back = document.getElementById('back-to-yours');
     if (back) {

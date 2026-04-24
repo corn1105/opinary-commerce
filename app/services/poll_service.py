@@ -19,11 +19,27 @@ def get_db() -> Client:
 async def list_polls() -> list[dict]:
     db = get_db()
     polls = db.table("polls").select("*").order("created_at", desc=True).execute().data or []
+    if not polls:
+        return polls
+    poll_ids = [p["id"] for p in polls]
+    # Batch: options for all polls, then recs for all options — avoids N+1 on the list view.
+    opts_rows = db.table("poll_options").select("*").in_("poll_id", poll_ids).order("sort_order").execute().data or []
+    opts_by_poll: dict[str, list] = {}
+    for o in opts_rows:
+        opts_by_poll.setdefault(o["poll_id"], []).append(o)
+    option_ids = [o["id"] for o in opts_rows]
+    rec_rows = (
+        db.table("recommendations").select("option_id").in_("option_id", option_ids).execute().data or []
+        if option_ids else []
+    )
+    recs_by_option: dict[str, int] = {}
+    for r in rec_rows:
+        recs_by_option[r["option_id"]] = recs_by_option.get(r["option_id"], 0) + 1
     for p in polls:
-        opts = db.table("poll_options").select("*").eq("poll_id", p["id"]).order("sort_order").execute().data or []
-        p["options"] = opts
+        p["options"] = opts_by_poll.get(p["id"], [])
         votes = db.table("votes").select("id", count="exact").eq("poll_id", p["id"]).execute()
         p["vote_count"] = votes.count or 0
+        p["rec_count"] = sum(recs_by_option.get(o["id"], 0) for o in p["options"])
     return polls
 
 
