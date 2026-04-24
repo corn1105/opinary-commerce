@@ -134,6 +134,14 @@ async def api_vote(poll_id: str, body: VoteRequest, request: Request):
 
     option_ids = {o["id"] for o in poll["options"]}
     if body.option_id not in option_ids:
+        # TEMP diagnostic — remove once 400-flood source is identified.
+        print(
+            f"[vote-400] poll={poll_id} bad_option={body.option_id} "
+            f"ua={request.headers.get('user-agent','-')} "
+            f"ref={request.headers.get('referer','-')} "
+            f"origin={request.headers.get('origin','-')}",
+            flush=True,
+        )
         raise HTTPException(status_code=400, detail="Invalid option for this poll")
 
     locale = parse_accept_language(request.headers.get("accept-language"))
