@@ -24,6 +24,21 @@ app.add_middleware(
 
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(exist_ok=True)
+
+# Mockups live in a separate (potentially volume-mounted) directory so they
+# survive Railway redeploys. On first boot of a fresh volume, seed it with
+# any mocks bundled in the image. Mount /static/mocks BEFORE /static so the
+# more-specific path takes precedence in Starlette's mount routing.
+from app.services.mockup_service import MOCKS_DIR, SEED_MOCKS_DIR
+
+MOCKS_DIR.mkdir(parents=True, exist_ok=True)
+if SEED_MOCKS_DIR.exists() and SEED_MOCKS_DIR.resolve() != MOCKS_DIR.resolve():
+    for src in SEED_MOCKS_DIR.glob("*.html"):
+        dst = MOCKS_DIR / src.name
+        if not dst.exists():
+            dst.write_bytes(src.read_bytes())
+
+app.mount("/static/mocks", StaticFiles(directory=str(MOCKS_DIR)), name="mocks")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 app.include_router(public_router)

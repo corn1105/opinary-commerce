@@ -6,6 +6,7 @@ and the admin "Create mockup" button.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Optional
@@ -14,7 +15,12 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup, Tag
 
-MOCKS_DIR = Path(__file__).parent.parent / "static" / "mocks"
+# Where generated mockup HTML files are written. Defaults to the in-repo
+# directory for local dev; on Railway set MOCKS_DIR=/data/mocks (or whatever
+# the persistent volume is mounted at) so the files survive redeploys.
+_DEFAULT_MOCKS_DIR = Path(__file__).parent.parent / "static" / "mocks"
+MOCKS_DIR = Path(os.environ.get("MOCKS_DIR", str(_DEFAULT_MOCKS_DIR)))
+SEED_MOCKS_DIR = _DEFAULT_MOCKS_DIR  # Always points at the in-repo bundled mocks for one-time seeding.
 
 UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
