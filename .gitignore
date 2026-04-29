@@ -12,6 +12,3 @@ __pycache__/
 # Local Claude Code state (not shared)
 .claude/
 
-# Generated demo mockups (regenerate via admin "Mockup" button or scripts/build_mock.py)
-app/static/mocks/*.html
-!app/static/mocks/.gitkeep
