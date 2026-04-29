@@ -199,8 +199,7 @@
     transform: translateY(8px);
     transition: opacity 0.6s ease 0.3s, transform 0.6s ease 0.3s;
   }
-  .bridge::before {
-    content: "BASED ON YOUR VOTE";
+  .bridge .bridge-eyebrow {
     display: block;
     color: var(--accent);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -393,7 +392,63 @@
 <script>
 (function () {
   const pollId = window.location.pathname.split('/').filter(Boolean).pop();
+  const forcedLocale = new URLSearchParams(window.location.search).get('locale');
   const root = document.getElementById('root');
+
+  function localizedQuestion(poll) {
+    if (!forcedLocale) return poll.question;
+    return ((poll.translations || {})[forcedLocale] || {}).question || poll.question;
+  }
+  function localizedLabel(opt) {
+    if (!forcedLocale) return opt.label;
+    return ((opt.translations || {})[forcedLocale] || {}).label || opt.label;
+  }
+
+  // UI string table. Single source of truth for all hardcoded copy in the
+  // widget. Add a new locale = one new entry. Captions are functions so the
+  // option label can be interpolated safely.
+  const STRINGS = {
+    en: {
+      livePoll: 'LIVE POLL',
+      vote: 'VOTE', votes: 'VOTES',
+      tallying: 'Tallying…',
+      buyNow: 'Buy now',
+      lowest: 'LOWEST',
+      basedOnVote: 'BASED ON YOUR VOTE',
+      youChose: (label) => `You chose <strong>${label}</strong>. Products based on what readers with the same answer picked.`,
+      viewingOthers: (label) => `Viewing readers who picked <strong>${label}</strong>. <a href="#" id="back-to-yours">Back to your vote →</a>`,
+      voteFailed: 'Could not record your vote. Please try again.',
+      pollUnavailable: 'Poll unavailable.',
+      badges: {
+        'TOP RATED': 'TOP RATED',
+        'MOST POPULAR': 'MOST POPULAR',
+        'BEST VALUE': 'BEST VALUE',
+        "EDITOR'S PICK": "EDITOR'S PICK",
+        'NEW RELEASE': 'NEW RELEASE',
+      },
+    },
+    de: {
+      livePoll: 'LIVE-UMFRAGE',
+      vote: 'STIMME', votes: 'STIMMEN',
+      tallying: 'Zählt…',
+      buyNow: 'Kaufen',
+      lowest: 'Bestpreis',
+      basedOnVote: 'ZU IHRER WAHL',
+      youChose: (label) => `Sie haben <strong>${label}</strong> gewählt. Empfehlungen anderer Leser mit derselben Antwort.`,
+      viewingOthers: (label) => `Leser, die <strong>${label}</strong> gewählt haben. <a href="#" id="back-to-yours">Zurück zu Ihrer Wahl →</a>`,
+      voteFailed: 'Stimme konnte nicht gezählt werden. Bitte erneut versuchen.',
+      pollUnavailable: 'Umfrage nicht verfügbar.',
+      badges: {
+        'TOP RATED': 'Top',
+        'MOST POPULAR': 'Beliebt',
+        'BEST VALUE': 'Günstig',
+        "EDITOR'S PICK": 'Empfehlung',
+        'NEW RELEASE': 'Neu',
+      },
+    },
+  };
+  const T = STRINGS[forcedLocale] || STRINGS.en;
+  const localizedBadge = (b) => T.badges[b] || b;
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -405,28 +460,27 @@
   }
 
   function chrome(votes) {
-    const votesPart = votes != null ? ` <span class="dot"></span> <span class="votes">${votes} VOTE${votes === 1 ? '' : 'S'}</span>` : '';
-    return `<div class="chrome">LIVE POLL${votesPart}</div>`;
+    const votesPart = votes != null
+      ? ` <span class="dot"></span> <span class="votes">${votes} ${votes === 1 ? T.vote : T.votes}</span>`
+      : '';
+    return `<div class="chrome">${T.livePoll}${votesPart}</div>`;
   }
 
   function footer(poll) {
-    const publisher = poll.publisher_logo
-      ? `<span class="publisher"><img src="${esc(poll.publisher_logo)}" alt="${esc(poll.publisher_name || '')}"></span>`
-      : (poll.publisher_name ? `<span class="publisher">${esc(poll.publisher_name).toUpperCase()}</span>` : '<span class="publisher"></span>');
-    return `<div class="footer">${publisher}<span class="brand">Opinary</span></div>`;
+    return `<div class="footer"><span class="publisher"></span><span class="brand">Opinary</span></div>`;
   }
 
   function renderVote(poll) {
     const opts = poll.options.map(o => `
       <button class="opt-vote" data-id="${esc(o.id)}">
         <span class="radio-box"><span class="radio"></span></span>
-        <span class="label">${esc(o.label)}</span>
+        <span class="label">${esc(localizedLabel(o))}</span>
       </button>
     `).join('');
     root.innerHTML = `
       <div class="inner">
         ${chrome(null)}
-        <div class="q-serif">${esc(poll.question)}</div>
+        <div class="q-serif">${esc(localizedQuestion(poll))}</div>
         <div class="opts-vote">${opts}</div>
       </div>
       ${footer(poll)}
@@ -499,9 +553,9 @@
               <div class="price-row">
                 <span class="merchant-logo" aria-label="${esc(m.name)}">${m.logo}</span>
                 <span class="price">${esc(m.price)}</span>
-                ${m.lowest ? '<span class="lowest">LOWEST</span>' : ''}
+                ${m.lowest ? `<span class="lowest">${T.lowest}</span>` : ''}
               </div>
-              <a class="buy" href="${esc(m.url || '#')}" target="_blank" rel="noopener nofollow sponsored">Buy now</a>
+              <a class="buy" href="${esc(m.url || '#')}" target="_blank" rel="noopener nofollow sponsored">${T.buyNow}</a>
             </div>
           `).join('')}
         </div>` : '';
@@ -510,7 +564,7 @@
         : `<div class="img">🛍</div>`;
       return `
         <div class="rec">
-          <div class="badge">${esc(p.badge)}</div>
+          <div class="badge">${esc(localizedBadge(p.badge))}</div>
           ${imgBlock}
           <div class="title">${esc(p.title)}</div>
           <div class="desc">${esc(p.description)}</div>
@@ -523,15 +577,15 @@
     const viewedLabel = viewedRow ? viewedRow.label : '';
     const isYourVote = viewingOptionId === data.voted_option_id;
     const captionText = isYourVote
-      ? `You chose <strong>${esc(viewedLabel)}</strong>. Products based on what readers with the same answer picked.`
-      : `Viewing readers who picked <strong>${esc(viewedLabel)}</strong>. <a href="#" id="back-to-yours">Back to your vote →</a>`;
+      ? T.youChose(esc(viewedLabel))
+      : T.viewingOthers(esc(viewedLabel));
 
     root.innerHTML = `
       <div class="inner">
         ${chrome(total)}
-        <div class="q-sans">${esc(poll.question)}</div>
+        <div class="q-sans">${esc(localizedQuestion(poll))}</div>
         <div class="opts-results">${rows}</div>
-        ${viewed.bridge ? `<div class="bridge">${esc(viewed.bridge)}</div>` : ''}
+        ${viewed.bridge ? `<div class="bridge"><span class="bridge-eyebrow">${T.basedOnVote}</span>${esc(viewed.bridge)}</div>` : ''}
         ${recs ? `<div class="recs" data-count="${recCount}">${recs}</div>` : ''}
         ${viewed.recommendations ? `<div class="caption">${captionText}</div>` : ''}
       </div>
@@ -580,12 +634,14 @@
   }
 
   async function castVote(poll, optionId) {
-    root.innerHTML = `<div class="inner">${chrome(null)}<div class="loading">Tallying…</div></div>${footer(poll)}`;
+    root.innerHTML = `<div class="inner">${chrome(null)}<div class="loading">${T.tallying}</div></div>${footer(poll)}`;
     postHeight();
     try {
+      const voteHeaders = { 'Content-Type': 'application/json' };
+      if (forcedLocale) voteHeaders['Accept-Language'] = forcedLocale;
       const res = await fetch(`/api/polls/${encodeURIComponent(pollId)}/vote`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: voteHeaders,
         body: JSON.stringify({ option_id: optionId }),
       });
       if (!res.ok) throw new Error('vote failed');
@@ -593,7 +649,7 @@
       viewingOptionId = data.voted_option_id;  // start by showing the user's chosen option
       renderResults(poll, data);
     } catch (e) {
-      renderError('Could not record your vote. Please try again.');
+      renderError(T.voteFailed);
     }
   }
 
@@ -614,7 +670,7 @@
       const poll = await res.json();
       renderVote(poll);
     } catch (e) {
-      renderError('Poll unavailable.');
+      renderError(T.pollUnavailable);
     }
   }
 

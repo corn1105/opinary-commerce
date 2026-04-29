@@ -3,11 +3,13 @@
   if (!me) return;
   var pollId = me.getAttribute('data-poll-id');
   if (!pollId) return;
+  var locale = me.getAttribute('data-locale');
 
   var origin = new URL(me.src).origin;
 
   var iframe = document.createElement('iframe');
-  iframe.src = origin + '/widget/' + encodeURIComponent(pollId);
+  iframe.src = origin + '/widget/' + encodeURIComponent(pollId)
+    + (locale ? '?locale=' + encodeURIComponent(locale) : '');
   iframe.setAttribute('scrolling', 'no');
   iframe.setAttribute('frameborder', '0');
   iframe.setAttribute('allowtransparency', 'true');

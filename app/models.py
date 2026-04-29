@@ -45,6 +45,11 @@ class EditBridgeRequest(BaseModel):
     bridge: str
 
 
+class CreateMockupRequest(BaseModel):
+    url: str
+    locale: Optional[Locale] = None
+
+
 class RecProduct(BaseModel):
     title: str
     description: str

@@ -1,3 +1,4 @@
+import asyncio
 import hmac
 from pathlib import Path
 from typing import Optional
@@ -8,12 +9,13 @@ from fastapi.responses import FileResponse, HTMLResponse
 from app.config import ADMIN_PASSWORD
 from app.models import (
     AdminAuthRequest,
+    CreateMockupRequest,
     EditBridgeRequest,
     PollCreateRequest,
     PollUpdateRequest,
     RegenerateRecsRequest,
 )
-from app.services import claude_service, poll_service
+from app.services import claude_service, mockup_service, poll_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -141,6 +143,27 @@ async def api_regenerate_recs(
         products=[p.model_dump() for p in payload.products],
     )
     return {"recommendation": row}
+
+
+@router.post("/api/polls/{poll_id}/mockup")
+async def api_create_mockup(
+    poll_id: str,
+    body: CreateMockupRequest,
+    admin_token: Optional[str] = Cookie(None),
+):
+    _check_auth(admin_token)
+    poll = await poll_service.get_poll(poll_id)
+    if not poll:
+        raise HTTPException(status_code=404, detail="Poll not found")
+    slug = mockup_service.slugify_for_url(body.url, poll_id)
+    try:
+        await asyncio.to_thread(
+            mockup_service.build_mockup, body.url, slug, poll_id, "", body.locale or ""
+        )
+    except mockup_service.MockupBuildError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    path = f"/static/mocks/{slug}.html"
+    return {"slug": slug, "path": path, "url": f"{path}?id={poll_id}"}
 
 
 @router.patch("/api/options/{option_id}/recommendations/bridge")

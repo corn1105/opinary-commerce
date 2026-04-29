@@ -78,9 +78,13 @@ async def widget(poll_id: str):
     payload = {
         "id": poll["id"],
         "question": poll["question"],
+        "translations": poll.get("translations") or {},
         "publisher_name": poll.get("publisher_name"),
         "publisher_logo": poll.get("publisher_logo"),
-        "options": [{"id": o["id"], "label": o["label"]} for o in poll["options"]],
+        "options": [
+            {"id": o["id"], "label": o["label"], "translations": o.get("translations") or {}}
+            for o in poll["options"]
+        ],
     }
     # Safe-inject: JSON can't contain raw `</` that would break the script block.
     inline = (
@@ -100,7 +104,9 @@ async def embed_js():
     return FileResponse(
         str(embed),
         media_type="application/javascript",
-        headers={"Cache-Control": "public, max-age=3600, immutable"},
+        # Short TTL + must-revalidate so script edits propagate within minutes.
+        # Without `immutable` the browser will conditional-GET on revalidation.
+        headers={"Cache-Control": "public, max-age=60, must-revalidate"},
     )
 
 
@@ -112,9 +118,13 @@ async def api_get_poll(poll_id: str):
     return {
         "id": poll["id"],
         "question": poll["question"],
+        "translations": poll.get("translations") or {},
         "publisher_name": poll.get("publisher_name"),
         "publisher_logo": poll.get("publisher_logo"),
-        "options": [{"id": o["id"], "label": o["label"]} for o in poll["options"]],
+        "options": [
+            {"id": o["id"], "label": o["label"], "translations": o.get("translations") or {}}
+            for o in poll["options"]
+        ],
     }
 
 
@@ -140,8 +150,15 @@ async def api_vote(poll_id: str, body: VoteRequest, request: Request):
     await poll_service.record_vote(poll_id, body.option_id, locale)
 
     results = await poll_service.get_results(poll_id)
+    # Swap option labels into the requested locale where translations exist.
+    label_overrides = {
+        o["id"]: (o.get("translations") or {}).get(locale, {}).get("label")
+        for o in poll["options"]
+    }
     for r in results["results"]:
         r["is_user_choice"] = r["option_id"] == body.option_id
+        if label_overrides.get(r["option_id"]):
+            r["label"] = label_overrides[r["option_id"]]
 
     # Ensure chosen option has recs cached; generate on the fly if missing.
     cached = await poll_service.get_cached_recs(body.option_id, locale)
