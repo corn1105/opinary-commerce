@@ -33,10 +33,16 @@ def main() -> None:
         help="Origin to load /embed.js from (e.g. https://opinarycommerce.up.railway.app). "
              "Empty = same-origin, suitable when the mockup is hosted on the OpinaryCommerce server.",
     )
+    parser.add_argument(
+        "--locale",
+        default="",
+        choices=["", "en", "de"],
+        help="Locale baked into the embed wrapper (data-locale attribute). Empty = let Accept-Language decide.",
+    )
     args = parser.parse_args()
 
     try:
-        out_path = build_mockup(args.url, args.out, args.default_poll_id, args.embed_origin)
+        out_path = build_mockup(args.url, args.out, args.default_poll_id, args.embed_origin, args.locale)
     except MockupBuildError as e:
         sys.exit(str(e))
 
