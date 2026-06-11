@@ -1,11 +1,17 @@
-"""Fill every un-cached (option, locale='en') recommendation via Claude.
+"""Fill every un-cached (option, locale) recommendation via Claude.
 
-Intended to run once after scripts/seed_polls.py so every poll option has a
-cached bridge+products and voting never hits Claude in the browser path.
+Intended to run after seeding/adding polls so every poll option has a cached
+bridge+products and voting never hits Claude in the browser path. Run once per
+served locale:
+
+    venv/bin/python scripts/fill_missing_recs.py --locale en
+    venv/bin/python scripts/fill_missing_recs.py --locale de
 
 Concurrency is capped at 5 to stay under Anthropic rate limits comfortably.
+Idempotent: options that already have a row in the target locale are skipped.
 """
 
+import argparse
 import asyncio
 import sys
 from pathlib import Path
@@ -18,9 +24,9 @@ from app.services import claude_service, poll_service  # noqa: E402
 SEM = asyncio.Semaphore(5)
 
 
-async def fill_option(poll_question: str, option: dict, context_notes: Optional[str]) -> Tuple[str, str]:
+async def fill_option(poll_question: str, option: dict, context_notes: Optional[str], locale: str) -> Tuple[str, str]:
     async with SEM:
-        cached = await poll_service.get_cached_recs(option["id"], "en")
+        cached = await poll_service.get_cached_recs(option["id"], locale)
         if cached:
             return (option["label"], "skip (already cached)")
         try:
@@ -28,11 +34,11 @@ async def fill_option(poll_question: str, option: dict, context_notes: Optional[
                 question=poll_question,
                 option_label=option["label"],
                 context_notes=context_notes,
-                locale="en",
+                locale=locale,
             )
             await poll_service.upsert_recs(
                 option_id=option["id"],
-                locale="en",
+                locale=locale,
                 bridge=payload.bridge,
                 products=[p.model_dump() for p in payload.products],
             )
@@ -42,6 +48,12 @@ async def fill_option(poll_question: str, option: dict, context_notes: Optional[
 
 
 async def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--locale", choices=["en", "de"], default="en",
+                        help="Served locale to fill missing recs for (default: en)")
+    args = parser.parse_args()
+    locale = args.locale
+
     db = poll_service.get_db()
     polls = db.table("polls").select("*").execute().data or []
     print(f"Checking {len(polls)} polls...")
@@ -50,10 +62,10 @@ async def main() -> None:
     for poll in polls:
         opts = db.table("poll_options").select("*").eq("poll_id", poll["id"]).order("sort_order").execute().data or []
         for opt in opts:
-            tasks.append((poll, opt, fill_option(poll["question"], opt, poll.get("context_notes"))))
+            tasks.append((poll, opt, fill_option(poll["question"], opt, poll.get("context_notes"), locale)))
 
     total = len(tasks)
-    print(f"Processing {total} (option, locale=en) pairs with concurrency=5...\n")
+    print(f"Processing {total} (option, locale={locale}) pairs with concurrency=5...\n")
 
     current_poll_id = None
     done = 0

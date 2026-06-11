@@ -52,9 +52,41 @@ PRICE_RANGES = {
     "dumbbells,fitness,gym":       (199, 499, 1199),
 }
 
-# Distinctive substrings — tested against EN poll question (case-insensitive).
-# Several questions were polished after the original needles were written, so
-# many of these are short fragments that survive minor editorial changes.
+# PRIMARY mapping: poll id -> category. Keyed by id (stable) so re-wording a
+# question or running a non-English (e.g. German) poll can never silently drop
+# the price — and with it the buy button. Covers every active poll; add a row
+# when you add a poll. The question-substring list below is only a fallback for
+# polls absent from this map.
+POLL_ID_TO_CATEGORY = {
+    "2b6575af-2ac8-490e-a93d-364878ee981b": "smartwatch,running,watch",   # Are you training for something?
+    "00ae2b55-ce68-4786-8f44-b723a88e4d74": "suitcase,luggage,travel",    # Carry-on only, or do you check a bag?
+    "5b2923e8-10f1-42db-8de1-b5af44e1c10c": "sunscreen,skincare,beach",   # Do you wear SPF daily?
+    "df173ccb-e636-4968-9803-95cedc20a989": "grill,bbq,barbecue",         # Gas, charcoal, or pellet grill?
+    "804c7bf8-4e57-4ee3-8a9b-abcc2a9ea3c5": "dumbbells,fitness,gym",      # Gym or home workouts?
+    "cf4db86d-4f0f-4b95-9d48-ccb7e17727e9": "doorbell,camera,security",   # Has a package ever been stolen from your porch?
+    "9cce8d26-54c4-432d-be0b-2eb20d8cd009": "espresso,coffee,machine",    # Home coffee or café coffee?
+    "e113e145-210c-44f3-83f4-736010665fac": "television,tv,livingroom",   # How big is your living-room TV?
+    "fc761120-5102-4a7c-8f0e-168a2eb6b490": "sunglasses,summer,beach",    # How did you lose or break your last pair of sunglasses?
+    "33021a8d-ff34-4482-832e-a3051b32361e": "mattress,bed,bedroom",       # How many hours sleep do you need?
+    "251d0db1-0bc9-4fb8-9525-c9b72b9dd876": "running,shoes,sneakers",     # How many miles do you run a week?
+    "eb8bbc4f-6965-4f3a-8a93-519aa26145f0": "kindle,ebook,reader",        # How many unread books are on your nightstand?
+    "ac540b1f-fc81-4822-941e-306da8fde58e": "vacuum,cleaner,floor",       # How often do you vacuum?
+    "f15ba3c4-779b-4fbc-a2d2-eab05692b247": "mattress,bed,bedroom",       # How old is your mattress?
+    "34390375-f77e-4134-b33d-6d149b788a74": "knife,chef,kitchen",         # How sharp is your chef's knife?
+    "31c466e6-015a-4f19-aa7a-214d5a3b4313": "air,purifier,bedroom",       # How's the air in your bedroom?
+    "ab8df30f-478a-45a5-b77e-683dc06748bd": "office,chair,desk",          # How's your back at the end of a workday?
+    "dc314590-acf0-43b3-b898-c68beb809bdc": "running,shoes,sneakers",     # Welche nachhaltige Schuhmarke passt am besten zu dir?
+    "e5479266-cd80-4c2c-a8ee-1f0b3a4351d6": "dog,cat,pet",                # What does your dog or cat eat?
+    "369c3184-1dbb-4ceb-a142-5f62e195afd9": "dumbbells,fitness,gym",      # What does your workout routine look like right now?
+    "5e748f6a-40d2-45f8-85a5-ac60e2b1111f": "skincare,face,serum",        # What's your biggest skin concern?
+    "7f82fb3b-bc3a-4fc7-a5dd-975119a39b37": "bicycle,bike,cycling",       # When did you last replace your main bike?
+    "bf393ca1-4163-46e2-a4a0-3e1e88f6476e": "headphones,audio,music",     # When did you last upgrade your headphones?
+    "f4a86a8a-7d8c-4665-82bf-ba69ab96d3ed": "thermostat,wall,smart",      # When did your energy bill last shock you?
+    "1798d051-20a4-403d-8813-6c61c4afd3fd": "sunscreen,skincare,beach",   # Which SPF do you reach for?
+}
+
+# FALLBACK: distinctive substrings — tested against the EN poll question
+# (case-insensitive). Only consulted when a poll id is absent from the map above.
 POLL_TO_CATEGORY = [
     ("miles do you run",                            "running,shoes,sneakers"),
     ("kilometres do you",                           "running,shoes,sneakers"),  # safety net for any unpolished/legacy data
@@ -81,9 +113,10 @@ POLL_TO_CATEGORY = [
     ("biggest skin concern",                        "skincare,face,serum"),
 ]
 
-# Currency by stored locale string. Drives both the symbol shown on the
-# merchant block and the "Best Buy" comparison row (which only makes sense
-# in the US, so we suppress alt_price for non-US locales).
+# Currency by stored locale string. Drives the symbol shown on the merchant
+# block and the comparison row. The *which retailer* decision (Best Buy for en,
+# a German retailer for de) is made at render time in public.py — this script
+# only produces the comparison price.
 LOCALE_CURRENCY = {
     "en":    "$",
     "en-US": "$",
@@ -92,7 +125,9 @@ LOCALE_CURRENCY = {
     "de":    "€",
     "de-DE": "€",
 }
-ALT_PRICE_LOCALES = {"en", "en-US"}  # Best Buy comparison only renders on US widgets
+# Locales that get a secondary-merchant comparison price. Includes de now that
+# the widget shows a German retailer there instead of Best Buy.
+ALT_PRICE_LOCALES = {"en", "en-US", "de", "de-DE"}
 
 BADGE_TIER = {
     "BEST VALUE": 0,
@@ -103,10 +138,16 @@ BADGE_TIER = {
 }
 
 
-def category_for(question: str) -> Optional[str]:
-    for needle, cat in POLL_TO_CATEGORY:
+def category_for(poll: dict) -> Optional[str]:
+    """Resolve a poll's price category. Prefers the stable poll-id map; falls
+    back to scanning the question text for legacy/unmapped polls."""
+    cat = POLL_ID_TO_CATEGORY.get(poll.get("id"))
+    if cat:
+        return cat
+    question = poll.get("question") or ""
+    for needle, c in POLL_TO_CATEGORY:
         if needle.lower() in question.lower():
-            return cat
+            return c
     return None
 
 
@@ -172,7 +213,7 @@ def main() -> None:
     print(f"Processing {len(recs)} recommendation rows...")
     for rec in recs:
         poll = polls.get(opt_to_poll.get(rec["option_id"]))
-        category = category_for(poll["question"]) if poll else None
+        category = category_for(poll) if poll else None
         if poll and category is None:
             no_category += 1
             print(f"  ⚠ no category for poll: {poll['question']!r}")
@@ -183,7 +224,7 @@ def main() -> None:
             # primary price
             if not p.get("price") and category:
                 p["price"] = estimate_price(p["title"], p.get("badge", "MOST POPULAR"), category, currency)
-            # secondary merchant price (US only — Best Buy logo doesn't make sense elsewhere)
+            # secondary merchant comparison price (retailer chosen per-locale at render)
             if p.get("price") and not p.get("alt_price") and show_alt:
                 p["alt_price"] = derive_alt_price(p["price"], currency)
             # description length cap

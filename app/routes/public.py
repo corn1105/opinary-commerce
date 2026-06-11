@@ -48,8 +48,22 @@ def _build_amazon_url(product: dict, locale: str) -> str:
     return f"https://www.amazon.{tld}/s?k={quote_plus(product['query'])}"
 
 
-def _build_bestbuy_url(product: dict) -> str:
-    return f"https://www.bestbuy.com/site/searchpage.jsp?st={quote_plus(product['query'])}"
+# Secondary "compare" merchant per locale. Best Buy doesn't exist in Europe, so
+# `de` uses Otto (broad German generalist — electronics, home, pet, fashion);
+# `en` keeps Best Buy. The comparison price is simulated upstream; this only
+# decides which retailer + search URL to show.
+SECONDARY_MERCHANT = {
+    "en": {"name": "Best Buy", "search": "https://www.bestbuy.com/site/searchpage.jsp?st={q}"},
+    "de": {"name": "Otto", "search": "https://www.otto.de/suche/{q}"},
+}
+
+
+def _secondary_merchant(locale: str) -> dict:
+    return SECONDARY_MERCHANT.get(locale, SECONDARY_MERCHANT["en"])
+
+
+def _build_alt_url(product: dict, locale: str) -> str:
+    return _secondary_merchant(locale)["search"].format(q=quote_plus(product["query"]))
 
 
 def _render_products(products: list, locale: str) -> list:
@@ -62,7 +76,8 @@ def _render_products(products: list, locale: str) -> list:
             "alt_price": p.get("alt_price"),
             "image_url": _thumb(p.get("image_url", "")),
             "amazon_url": _build_amazon_url(p, locale),
-            "bestbuy_url": _build_bestbuy_url(p),
+            "alt_merchant": _secondary_merchant(locale)["name"],
+            "alt_url": _build_alt_url(p, locale),
         }
         for p in products
     ]
