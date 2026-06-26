@@ -34,6 +34,22 @@ NOISE_RE = re.compile(
     re.I,
 )
 
+# <p> tags that live inside these elements are chrome (deks, photo captions,
+# bylines, affiliate disclosures, related-article rails), not article body.
+NONBODY_ANCESTORS = {"header", "aside", "figure", "figcaption", "nav", "footer"}
+
+# Short meta lines that sometimes sit among the body <p> (timestamps, photo
+# credits, affiliate disclaimers). Matched against the paragraph's own text.
+META_TEXT_RE = re.compile(
+    r"(©|^stand:|^foto:|^bild:|^quelle:|when you purchase|^lesedauer|"
+    r"^\s*\d{1,2}\.\d{1,2}\.\d{4})",
+    re.I,
+)
+
+# Below this length a leading <p> is almost always a caption/credit/meta line
+# rather than a real body paragraph.
+MIN_BODY_PARA_LEN = 40
+
 URL_ATTRS = {
     "img": ["src", "data-src"],
     "source": ["src"],
@@ -107,12 +123,40 @@ def strip_noise(soup: BeautifulSoup) -> None:
             el.decompose()
 
 
-def find_injection_point(soup: BeautifulSoup) -> Optional[Tag]:
-    """Return the paragraph the poll should be inserted after.
+def _body_paragraphs(container: Tag) -> list:
+    """Real article-body <p> tags, excluding chrome and short meta lines.
 
-    Placement is "after the fold": the poll sits just after the 2nd non-empty
-    paragraph, but never deeper than the top third of the article by text
-    volume (the floor and ceiling collapse to whichever is shallower).
+    Skips paragraphs nested in header/aside/figure/caption/nav/footer (deks,
+    photo captions, bylines, affiliate disclosures, related rails) and short
+    meta lines (timestamps, credits) so placement lands inside the body text
+    rather than above it.
+    """
+    out = []
+    stop = container.parent
+    for p in container.find_all("p", recursive=True):
+        text = p.get_text(strip=True)
+        if not text or len(text) < MIN_BODY_PARA_LEN or META_TEXT_RE.search(text):
+            continue
+        anc = p.parent
+        in_chrome = False
+        while anc is not None and anc is not stop:
+            if anc.name in NONBODY_ANCESTORS:
+                in_chrome = True
+                break
+            anc = anc.parent
+        if not in_chrome:
+            out.append(p)
+    return out
+
+
+def find_injection_point(soup: BeautifulSoup) -> Optional[Tag]:
+    """Return the body paragraph the poll should be inserted after.
+
+    Placement is "after the fold": the poll sits just after the 2nd real body
+    paragraph, but never deeper than the top third of the body by text volume
+    (the floor and ceiling collapse to whichever is shallower). Non-body <p>
+    (deks, captions, bylines, disclosures) are excluded via _body_paragraphs so
+    the poll never lands above the article body.
     """
     container = soup.find("article") or soup.find("main")
     if container is None:
@@ -121,16 +165,19 @@ def find_injection_point(soup: BeautifulSoup) -> Optional[Tag]:
             return None
         container = max(candidates, key=lambda d: len(d.find_all("p", recursive=True)))
 
-    paragraphs = [p for p in container.find_all("p", recursive=True) if p.get_text(strip=True)]
+    paragraphs = _body_paragraphs(container)
+    if len(paragraphs) < 2:
+        # Fall back to any non-empty paragraph when body detection is too strict.
+        paragraphs = [p for p in container.find_all("p", recursive=True) if p.get_text(strip=True)]
     if len(paragraphs) < 2:
         return paragraphs[-1] if paragraphs else None
 
     lengths = [len(p.get_text(strip=True)) for p in paragraphs]
 
-    # "After the fold" floor: the 2nd non-empty paragraph (index 1).
+    # "After the fold" floor: the 2nd body paragraph (index 1).
     floor_idx = 1 if len(paragraphs) > 1 else 0
 
-    # Top-third-by-volume ceiling: first paragraph crossing 1/3 of total text.
+    # Top-third-by-volume ceiling: first body paragraph crossing 1/3 of total text.
     one_third = sum(lengths) / 3
     running = 0
     ceil_idx = len(paragraphs) - 1
@@ -140,7 +187,7 @@ def find_injection_point(soup: BeautifulSoup) -> Optional[Tag]:
             ceil_idx = i
             break
 
-    # Never deeper than the top third; otherwise sit just after the 2nd paragraph.
+    # Never deeper than the top third; otherwise sit just after the 2nd body paragraph.
     return paragraphs[min(floor_idx, ceil_idx)]
 
 
