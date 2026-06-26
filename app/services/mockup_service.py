@@ -108,6 +108,12 @@ def strip_noise(soup: BeautifulSoup) -> None:
 
 
 def find_injection_point(soup: BeautifulSoup) -> Optional[Tag]:
+    """Return the paragraph the poll should be inserted after.
+
+    Placement is "after the fold": the poll sits just after the 2nd non-empty
+    paragraph, but never deeper than the top third of the article by text
+    volume (the floor and ceiling collapse to whichever is shallower).
+    """
     container = soup.find("article") or soup.find("main")
     if container is None:
         candidates = soup.find_all("div")
@@ -120,13 +126,22 @@ def find_injection_point(soup: BeautifulSoup) -> Optional[Tag]:
         return paragraphs[-1] if paragraphs else None
 
     lengths = [len(p.get_text(strip=True)) for p in paragraphs]
-    target = sum(lengths) / 2
+
+    # "After the fold" floor: the 2nd non-empty paragraph (index 1).
+    floor_idx = 1 if len(paragraphs) > 1 else 0
+
+    # Top-third-by-volume ceiling: first paragraph crossing 1/3 of total text.
+    one_third = sum(lengths) / 3
     running = 0
-    for p, length in zip(paragraphs, lengths):
+    ceil_idx = len(paragraphs) - 1
+    for i, length in enumerate(lengths):
         running += length
-        if running >= target:
-            return p
-    return paragraphs[-1]
+        if running >= one_third:
+            ceil_idx = i
+            break
+
+    # Never deeper than the top third; otherwise sit just after the 2nd paragraph.
+    return paragraphs[min(floor_idx, ceil_idx)]
 
 
 def build_embed_block(
