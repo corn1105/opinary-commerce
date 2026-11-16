@@ -39,6 +39,36 @@ def _cache_bust(poll_id: str) -> None:
     _poll_cache.pop(poll_id, None)
 
 
+# Supabase returns at most 1000 rows per request by default.
+_PAGE_SIZE = 1000
+
+
+def _select_all_in(table: str, column: str, in_col: str, ids: list) -> list[dict]:
+    """Fetch `column` for every row of `table` whose `in_col` is in `ids`.
+
+    Pages past the per-request row cap (using the exact total from the first
+    response) so batch counts never silently stop at 1000 rows.
+    """
+    db = get_db()
+    rows: list[dict] = []
+    total: Optional[int] = None
+    while total is None or len(rows) < total:
+        res = (
+            db.table(table)
+            .select(column, count="exact")
+            .in_(in_col, ids)
+            .order("id")
+            .range(len(rows), len(rows) + _PAGE_SIZE - 1)
+            .execute()
+        )
+        page = res.data or []
+        if not page:
+            break
+        rows.extend(page)
+        total = res.count if res.count is not None else len(rows)
+    return rows
+
+
 # ---------- Polls ----------
 
 async def list_polls() -> list[dict]:
@@ -47,23 +77,24 @@ async def list_polls() -> list[dict]:
     if not polls:
         return polls
     poll_ids = [p["id"] for p in polls]
-    # Batch: options for all polls, then recs for all options — avoids N+1 on the list view.
+    # Batch: options, recs and votes for all polls in one go — avoids N+1 on the
+    # list view (it used to run one vote-count request per poll, ~0.3s each).
     opts_rows = db.table("poll_options").select("*").in_("poll_id", poll_ids).order("sort_order").execute().data or []
     opts_by_poll: dict[str, list] = {}
     for o in opts_rows:
         opts_by_poll.setdefault(o["poll_id"], []).append(o)
     option_ids = [o["id"] for o in opts_rows]
-    rec_rows = (
-        db.table("recommendations").select("option_id").in_("option_id", option_ids).execute().data or []
-        if option_ids else []
-    )
+    rec_rows = _select_all_in("recommendations", "option_id", "option_id", option_ids) if option_ids else []
     recs_by_option: dict[str, int] = {}
     for r in rec_rows:
         recs_by_option[r["option_id"]] = recs_by_option.get(r["option_id"], 0) + 1
+    vote_rows = _select_all_in("votes", "poll_id", "poll_id", poll_ids)
+    votes_by_poll: dict[str, int] = {}
+    for v in vote_rows:
+        votes_by_poll[v["poll_id"]] = votes_by_poll.get(v["poll_id"], 0) + 1
     for p in polls:
         p["options"] = opts_by_poll.get(p["id"], [])
-        votes = db.table("votes").select("id", count="exact").eq("poll_id", p["id"]).execute()
-        p["vote_count"] = votes.count or 0
+        p["vote_count"] = votes_by_poll.get(p["id"], 0)
         p["rec_count"] = sum(recs_by_option.get(o["id"], 0) for o in p["options"])
     return polls
 
