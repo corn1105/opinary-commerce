@@ -20,7 +20,14 @@
                         snapshot = /static/lockscreen-data (no login needed)
     &guide=1            show the dashed 75%-of-screen line
     &pad=<px>           space around the phone (default 8 inside a frame, 24 full page)
+    &max=<n>            largest scale (default 1 = real size; >1 lets it grow to fill)
+    &wp=0..6            pick a wallpaper (default: chosen from the poll id)
+    &flat=1             no drop shadow (for tight frames, e.g. a slide)
     &v=<anything>       cache-buster, passed on to the widget
+
+  A self-contained copy (scripts/build_standalone_phone.py) sets
+  window.PHONE_PARAMS and window.PHONE_WIDGET_SRCDOC instead of using the URL.
+  A parent page can send {type: 'opinary-phone-reset'} to start the poll again.
 -->
 <style>
   :root { --s: 1; }
@@ -32,6 +39,7 @@
     overflow: hidden;
   }
   html.top body { background: radial-gradient(80% 60% at 50% 40%, #2a2a2f 0%, #111113 70%); }
+  html.flat .phone { box-shadow: inset 0 0 0 2px #3a3a3f, inset 0 0 0 5px #0c0c0d; }
 
   /* Generic phone — no real brand, logo or OEM shape */
   .phone {
@@ -74,6 +82,7 @@
   .wp3 { background: radial-gradient(80% 60% at 70% 15%, #c084fc 0%, transparent 60%), radial-gradient(90% 60% at 20% 80%, #f472b6 0%, transparent 60%), linear-gradient(180deg, #312e81, #0f0c29); }
   .wp4 { background: radial-gradient(90% 60% at 25% 10%, #ffe0b2 0%, transparent 60%), radial-gradient(90% 70% at 80% 70%, #f59e0b 0%, transparent 65%), linear-gradient(170deg, #b45309, #3b1d0b); }
   .wp5 { background: radial-gradient(70% 50% at 50% 25%, rgba(255, 90, 31, 0.6) 0%, transparent 60%), linear-gradient(180deg, #2a2a2e, #0b0b0d); }
+  .wp6 { background: radial-gradient(90% 55% at 80% 10%, #3191C9 0%, transparent 60%), radial-gradient(80% 50% at 15% 85%, rgba(0, 208, 132, 0.55) 0%, transparent 60%), linear-gradient(170deg, #162E95 0%, #000930 100%); }
 </style>
 </head>
 <body>
@@ -97,7 +106,7 @@
 </div>
 <script>
 (function () {
-  const P = new URLSearchParams(location.search);
+  const P = new URLSearchParams(window.PHONE_PARAMS || location.search);
   const pollId = P.get('poll') || '';
   const locale = P.get('locale') === 'de' ? 'de' : 'en';
   const state = P.get('state') === 'results' ? 'results' : 'vote';
@@ -105,12 +114,14 @@
   const isTop = window.top === window;
   if (isTop) document.documentElement.classList.add('top');
   if (P.get('guide') === '1') document.documentElement.classList.add('guide');
+  if (P.get('flat') === '1') document.documentElement.classList.add('flat');
   document.documentElement.lang = locale;
 
   // Same poll → same wallpaper every time.
   let h = 0;
   for (const c of pollId) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  document.getElementById('screen').classList.add('wp' + (h % 6));
+  const wp = /^[0-6]$/.test(P.get('wp') || '') ? P.get('wp') : String(h % 6);
+  document.getElementById('screen').classList.add('wp' + wp);
 
   function tick() {
     const tag = locale === 'de' ? 'de-DE' : 'en-GB';
@@ -122,8 +133,9 @@
 
   // Scale the phone to fit the space it's given (never larger than real size).
   const pad = P.has('pad') ? Number(P.get('pad')) : (isTop ? 24 : 8);
+  const maxScale = Number(P.get('max')) || 1;
   function fit() {
-    const s = Math.min((innerWidth - 2 * pad) / 414, (innerHeight - 2 * pad) / 868, 1);
+    const s = Math.min((innerWidth - 2 * pad) / 414, (innerHeight - 2 * pad) / 868, maxScale);
     document.documentElement.style.setProperty('--s', Math.max(s, 0.1));
   }
   fit();
@@ -133,11 +145,25 @@
   const q = new URLSearchParams({ poll: pollId, locale, theme: 'glass', preview: src });
   if (state === 'results') q.set('voted', 'top');
   if (P.get('v')) q.set('v', P.get('v'));
-  widget.src = '/static/widget-compact.html?' + q;
+  if (window.PHONE_WIDGET_SRCDOC) widget.srcdoc = window.PHONE_WIDGET_SRCDOC;   // self-contained copy
+  else widget.src = '/static/widget-compact.html?' + q;
+
+  // Arrow keys pressed inside the widget still reach whatever page holds this
+  // phone (e.g. a slide deck that pages on arrow keys).
+  widget.addEventListener('load', () => {
+    try {
+      widget.contentDocument.addEventListener('keydown', (e) => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: e.key, bubbles: true }));
+      });
+    } catch (_) { /* different origin: nothing to forward */ }
+  });
 
   addEventListener('message', (e) => {
     if (e.source === widget.contentWindow && e.data && e.data.type === 'opinary-height') {
       widget.style.height = e.data.height + 'px';
+    }
+    if (e.data && e.data.type === 'opinary-phone-reset' && widget.contentWindow) {
+      widget.contentWindow.postMessage({ type: 'opinary-preview', state }, '*');
     }
   });
 })();

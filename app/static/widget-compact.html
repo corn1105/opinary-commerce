@@ -319,7 +319,9 @@
 
 <script>
 (function () {
-  const params = new URLSearchParams(window.location.search);
+  // A self-contained copy (e.g. a slide demo, see scripts/build_standalone_phone.py)
+  // passes its settings and data in directly instead of via the URL and server.
+  const params = new URLSearchParams(window.OPINARY_PARAMS || window.location.search);
   const lastSeg = window.location.pathname.split('/').filter(Boolean).pop() || '';
   const pollId = params.get('poll') || (lastSeg.endsWith('.html') ? null : lastSeg);
   const forcedLocale = params.get('locale');
@@ -392,6 +394,7 @@
   // ---------- Vote state ----------
   function renderVote(poll) {
     state = 'vote';
+    prevFill = {};   // bars grow from zero again on the next vote
     const opts = poll.options.map(o => `
       <button class="opt-vote" data-id="${esc(o.id)}">
         <span class="radio-box"><span class="radio"></span></span>
@@ -556,6 +559,10 @@
   }
 
   async function loadPoll() {
+    if (PREVIEW && window.OPINARY_SNAPSHOT) {
+      snapshot = window.OPINARY_SNAPSHOT;
+      return snapshot.poll;
+    }
     if (PREVIEW) {
       const res = await fetch(PREVIEW_ADMIN
         ? `/admin/api/polls/${encodeURIComponent(pollId)}/preview?locale=${encodeURIComponent(forcedLocale || 'en')}`
