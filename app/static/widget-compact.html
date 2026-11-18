@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Opinary Poll (compact)</title>
+<link rel="preconnect" href="https://m.media-amazon.com" crossorigin>
+<!--POLL_DATA_PLACEHOLDER-->
+<!--
+  COMPACT / MOBILE variant of widget.html — a PROPOSAL, not live yet.
+
+  What's different from widget.html:
+    0. BEFORE voting nothing shrinks: big question and big answer buttons, the
+       same as today's widget. Only the header/footer chrome is one slim line.
+    1. After voting, the answers shrink into a compact results strip (one thin
+       row per answer, or a 2x2 grid when labels are short). Tapping another
+       answer CHANGES your vote and swaps in that answer's bridge + products.
+    2. Product cards show only image, name, one price and one buy link (Amazon).
+       No description, no badge, no second "compare" merchant.
+    3. Footer is folded into the header line.
+  Target: the whole voted state fits in 75% of a 390x844 phone screen (633px).
+
+  URL parameters:
+    ?poll=<id>        which poll (or served as /widget/<id> like the live widget)
+    &locale=en|de     force language
+    &preview=1        read-only: data comes from /static/lockscreen-data/<id>.json,
+                      votes are simulated on screen and NEVER sent to the server
+    &voted=<id>|top   (preview only) open straight in the voted state
+    &theme=glass      transparent card for a frosted lock-screen container
+    &measure=1        no images, no animation — used by the showcase's fit check
+    &tag=<text>       echoed back in the height message (lets a page match replies)
+-->
+<style>
+  :root {
+    --accent: #ff5a1f;
+    --accent-soft: #ffd9c7;
+    --accent-softer: #fff1e9;
+    --ink: #111;
+    --muted: #6a6a6a;
+    --hair: #e6e6e6;
+    --card-bg: #fff;
+    --card-border: 1px solid var(--hair);
+    --row-bg: #f2f2f2;
+    --row-fill: #e0e0e0;
+  }
+  html.glass {
+    --card-bg: transparent;
+    --card-border: 0;
+    --row-bg: rgba(0, 0, 0, 0.06);
+    --row-fill: rgba(0, 0, 0, 0.09);
+    --hair: rgba(0, 0, 0, 0.1);
+    --muted: #4f4f4f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font-family: inherit; color: inherit; }
+
+  .card {
+    background: var(--card-bg);
+    border: var(--card-border);
+    border-radius: 16px;
+    max-width: 500px;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+  html.glass .card { border-radius: 0; }
+  .inner { padding: 12px 12px 12px; }
+
+  /* Header — one line, replaces the old top chrome + footer */
+  .top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 18px;
+    margin-bottom: 8px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .top .app {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    background: var(--ink);
+    color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: Georgia, "Times New Roman", serif;
+    font-style: italic;
+    font-size: 12px;
+    letter-spacing: 0;
+    text-transform: none;
+    flex-shrink: 0;
+  }
+  .top .dot {
+    width: 7px; height: 7px;
+    background: #e53935;
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: opinary-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes opinary-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .top .spacer { flex: 1; }
+  .top .brand {
+    font-family: Georgia, "Times New Roman", serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 13px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* ----- Vote state: deliberately NOT compact. Same big question and big
+     answer buttons as today's widget (widget.html); only the results collapse. */
+  .inner.vote { padding: 12px 16px 18px; }
+  .q-vote {
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-size: 26px;
+    line-height: 1.25;
+    font-weight: 500;
+    text-align: center;
+    margin: 14px 6px 26px;
+  }
+  .opts-vote { display: flex; flex-direction: column; gap: 10px; }
+  .opt-vote {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    min-height: 56px;
+    padding: 0;
+    background: #fff;
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    overflow: hidden;
+    cursor: pointer;
+    text-align: left;
+    transition: transform 0.08s ease, border-color 0.15s;
+  }
+  .opt-vote:hover { border-color: var(--accent); }
+  .opt-vote:active { transform: scale(0.995); }
+  .opt-vote .radio-box {
+    width: 72px;
+    background: #f2f2f2;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .opt-vote .radio {
+    width: 18px; height: 18px;
+    border: 2px solid #c7c7c7;
+    border-radius: 50%;
+  }
+  .opt-vote:hover .radio { border-color: var(--accent); }
+  .opt-vote .label {
+    flex-grow: 1;
+    padding: 14px 18px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  /* ----- Results state ----- */
+  .q-res {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0 2px 8px;
+  }
+  .rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .rows.two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 10px;
+    background: var(--row-bg);
+    border: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: left;
+  }
+  .row .fill {
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    background: var(--row-fill);
+    transition: width 0.5s ease;
+  }
+  .row .check, .row .label, .row .pct { position: relative; }
+  .row .label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .pct { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .row.chosen { background: var(--accent-softer); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .row.chosen .fill { background: var(--accent-soft); }
+  .row.chosen .label { font-weight: 700; }
+  .row.chosen .pct { color: var(--ink); font-weight: 800; }
+  .row .check {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+  .row:not(.chosen):hover { filter: brightness(0.97); }
+  .hint { font-size: 11px; color: var(--muted); margin: 5px 2px 0; line-height: 14px; }
+
+  /* Bridge — kept as the hero, just tighter */
+  .bridge {
+    margin: 10px 0;
+    padding: 8px 12px 10px;
+    background: #111;
+    color: #fff;
+    border-radius: 12px;
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    font-size: 14px;
+    line-height: 1.28;
+    opacity: 0;
+    transition: opacity 0.5s ease 0.2s;
+  }
+  .bridge.in { opacity: 1; }
+  .bridge .eyebrow {
+    display: block;
+    color: var(--accent);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 8.5px;
+    letter-spacing: 0.18em;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  /* Products — image, name, one price, one buy. The whole card is the link. */
+  .recs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .recs[data-count="1"] { grid-template-columns: minmax(0, 200px); justify-content: center; }
+  .recs[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rec {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 6px;
+    background: #fff;
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .rec .img {
+    height: 60px;
+    border-radius: 8px;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+    overflow: hidden;
+  }
+  .rec .img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .rec .title {
+    margin: 5px 1px 3px;
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1.2;
+    min-height: 2.4em;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .rec .price {
+    margin: auto 1px 0;
+    font-size: 13px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .rec .buy {
+    display: block;
+    margin-top: 5px;
+    padding: 6px 0;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .rec:hover .buy { filter: brightness(0.95); }
+
+  .swap { animation: opinary-fade 0.35s ease; }
+  @keyframes opinary-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  html.no-motion *, html.no-motion *::before { transition: none !important; animation: none !important; }
+  html.no-motion .bridge { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .top .dot, .swap { animation: none; }
+    .row .fill, .bridge { transition: none; }
+    .bridge { opacity: 1; }
+  }
+
+  .loading, .error { text-align: center; padding: 26px 10px; color: var(--muted); font-size: 13px; }
+  .error { color: #b00020; }
+</style>
+</head>
+<body>
+<div class="card" id="root">
+  <div class="inner"><div class="loading">Loading poll…</div></div>
+</div>
+
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const lastSeg = window.location.pathname.split('/').filter(Boolean).pop() || '';
+  const pollId = params.get('poll') || (lastSeg.endsWith('.html') ? null : lastSeg);
+  const forcedLocale = params.get('locale');
+  const PREVIEW = params.has('preview');
+  const MEASURE = params.has('measure');
+  const startVoted = params.get('voted');
+  if (params.get('theme') === 'glass') document.documentElement.classList.add('glass');
+  if (MEASURE) document.documentElement.classList.add('no-motion');
+  const root = document.getElementById('root');
+
+  function localizedQuestion(poll) {
+    if (!forcedLocale) return poll.question;
+    return ((poll.translations || {})[forcedLocale] || {}).question || poll.question;
+  }
+  function localizedLabel(opt) {
+    if (!forcedLocale) return opt.label;
+    return ((opt.translations || {})[forcedLocale] || {}).label || opt.label;
+  }
+
+  const STRINGS = {
+    en: {
+      livePoll: 'Live poll',
+      vote: 'vote', votes: 'votes',
+      tallying: 'Tallying…',
+      buyNow: 'Buy now',
+      basedOnVote: 'Based on your vote',
+      changeHint: 'Changed your mind? Tap another answer.',
+      voteFailed: 'Could not record your vote. Please try again.',
+      pollUnavailable: 'Poll unavailable.',
+    },
+    de: {
+      livePoll: 'Live-Umfrage',
+      vote: 'Stimme', votes: 'Stimmen',
+      tallying: 'Zählt…',
+      buyNow: 'Kaufen',
+      basedOnVote: 'Zu Ihrer Wahl',
+      changeHint: 'Meinung geändert? Tippen Sie eine andere Antwort an.',
+      voteFailed: 'Stimme konnte nicht gezählt werden. Bitte erneut versuchen.',
+      pollUnavailable: 'Umfrage nicht verfügbar.',
+    },
+  };
+  const T = STRINGS[forcedLocale] || STRINGS.en;
+  const numberLocale = forcedLocale === 'de' ? 'de-DE' : 'en-US';
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  let state = 'loading';
+  function postHeight() {
+    try {
+      window.parent.postMessage({
+        type: 'opinary-height',
+        height: document.documentElement.scrollHeight,
+        cardHeight: Math.ceil(root.getBoundingClientRect().height),
+        state: state,
+        pollId: pollId,
+        optionId: lastData ? lastData.voted_option_id : null,
+        tag: params.get('tag'),   // echoed back so a measuring page can match replies to requests
+      }, '*');
+    } catch (_) {}
+  }
+
+  function header(votes) {
+    const votesPart = votes != null
+      ? `<span class="dot"></span><span>${votes.toLocaleString(numberLocale)} ${votes === 1 ? T.vote : T.votes}</span>`
+      : '';
+    return `<div class="top"><span class="app">O</span><span>${T.livePoll}</span>${votesPart}<span class="spacer"></span><span class="brand">Opinary</span></div>`;
+  }
+
+  // ---------- Vote state ----------
+  function renderVote(poll) {
+    state = 'vote';
+    const opts = poll.options.map(o => `
+      <button class="opt-vote" data-id="${esc(o.id)}">
+        <span class="radio-box"><span class="radio"></span></span>
+        <span class="label">${esc(localizedLabel(o))}</span>
+      </button>`).join('');
+    root.innerHTML = `
+      <div class="inner vote">
+        ${header(null)}
+        <div class="q-vote">${esc(localizedQuestion(poll))}</div>
+        <div class="opts-vote">${opts}</div>
+      </div>`;
+    root.querySelectorAll('.opt-vote').forEach(btn => {
+      btn.addEventListener('click', () => castVote(poll, btn.dataset.id));
+    });
+    postHeight();
+  }
+
+  // ---------- Results state ----------
+  let lastPoll = null;
+  let lastData = null;
+  let prevFill = {};   // option_id -> last rendered fill %, so bars glide on a vote change
+
+  function renderResults(poll, data, changed) {
+    state = 'results';
+    lastPoll = poll;
+    lastData = data;
+    const total = data.total || 0;
+    const mine = data.voted_option_id;
+    const viewed = (data.by_option || {})[mine] || {};
+
+    const rows = data.results.map(r => {
+      const pct = total ? Math.round((r.count / total) * 100) : 0;
+      const chosen = r.option_id === mine;
+      const from = prevFill[r.option_id] != null ? prevFill[r.option_id] : 0;
+      return `<button class="row${chosen ? ' chosen' : ''}" data-oid="${esc(r.option_id)}" data-pct="${pct}" aria-pressed="${chosen}">
+        <span class="fill" style="width:${from}%"></span>
+        ${chosen ? '<span class="check" aria-hidden="true">✓</span>' : ''}
+        <span class="label">${esc(r.label)}</span>
+        <span class="pct">${pct}%</span>
+      </button>`;
+    }).join('');
+
+    const products = viewed.recommendations || [];
+    const recs = products.map(p => {
+      const img = p.image_url && !MEASURE
+        ? `<img src="${esc(p.image_url)}" alt="" onerror="this.parentNode.textContent='🛍'">`
+        : '🛍';
+      return `<a class="rec" href="${esc(p.amazon_url || '#')}" target="_blank" rel="noopener nofollow sponsored">
+        <span class="img">${img}</span>
+        <span class="title">${esc(p.title)}</span>
+        ${p.price ? `<span class="price">${esc(p.price)}</span>` : ''}
+        <span class="buy">${T.buyNow}</span>
+      </a>`;
+    }).join('');
+
+    const swap = changed ? ' swap' : '';
+    root.innerHTML = `
+      <div class="inner">
+        ${header(total)}
+        <div class="q-res">${esc(localizedQuestion(poll))}</div>
+        <div class="rows">${rows}</div>
+        <div class="hint">${T.changeHint}</div>
+        ${viewed.bridge ? `<div class="bridge${changed ? ' in' : ''}${swap}"><span class="eyebrow">${T.basedOnVote}</span>${esc(viewed.bridge)}</div>` : ''}
+        ${recs ? `<div class="recs${swap}" data-count="${products.length}">${recs}</div>` : ''}
+      </div>`;
+
+    layoutRows();
+
+    root.querySelectorAll('.row').forEach(el => {
+      el.addEventListener('click', () => {
+        if (el.dataset.oid !== lastData.voted_option_id) changeVote(el.dataset.oid);
+      });
+    });
+
+    const fills = () => root.querySelectorAll('.row').forEach(el => {
+      el.querySelector('.fill').style.width = el.dataset.pct + '%';
+      prevFill[el.dataset.oid] = Number(el.dataset.pct);
+    });
+    if (MEASURE) {
+      fills();
+    } else {
+      // setTimeout, not requestAnimationFrame: rAF never fires in a hidden or
+      // off-screen iframe, which would leave the bridge invisible.
+      setTimeout(() => {
+        fills();
+        const bridge = root.querySelector('.bridge');
+        if (bridge) bridge.classList.add('in');
+      }, 30);
+    }
+    postHeight();
+  }
+
+  // Short labels → 2x2 grid (half the height). Falls back to one row per answer
+  // as soon as any label would be cut off.
+  function layoutRows() {
+    const box = root.querySelector('.rows');
+    if (!box) return;
+    box.classList.remove('two-col');
+    const n = box.children.length;
+    if (n < 2 || n % 2 !== 0) return;
+    box.classList.add('two-col');
+    const truncated = [...box.querySelectorAll('.label')].some(l => l.scrollWidth > l.clientWidth + 1);
+    if (truncated) box.classList.remove('two-col');
+  }
+
+  // Tapping another answer moves the reader's vote: one vote leaves the old
+  // answer, one joins the new one, and that answer's bridge + products swap in.
+  // LIVE MODE CAVEAT: this only changes what the reader sees. The server still
+  // counts the first vote — making the change stick needs a small server
+  // addition (vote returns a receipt id; a "change vote" call updates that row).
+  function changeVote(newId) {
+    const oldId = lastData.voted_option_id;
+    const data = Object.assign({}, lastData, {
+      voted_option_id: newId,
+      results: lastData.results.map(r => Object.assign({}, r, {
+        count: r.count + (r.option_id === newId ? 1 : 0) - (r.option_id === oldId ? 1 : 0),
+      })),
+    });
+    renderResults(lastPoll, data, true);
+  }
+
+  function renderError(msg) {
+    state = 'error';
+    root.innerHTML = `<div class="inner"><div class="error">${esc(msg)}</div></div>`;
+    postHeight();
+  }
+
+  // ---------- Data ----------
+  let snapshot = null;  // preview mode only
+
+  function previewVoteResponse(optionId) {
+    const loc = snapshot.locales[forcedLocale] || snapshot.locales.en;
+    return {
+      results: loc.results.map(r => Object.assign({}, r, { count: r.count + (r.option_id === optionId ? 1 : 0) })),
+      total: loc.total + 1,
+      by_option: loc.by_option,
+      voted_option_id: optionId,
+    };
+  }
+
+  async function castVote(poll, optionId) {
+    if (PREVIEW) {
+      // Simulated on screen only. Nothing is sent to the server.
+      renderResults(poll, previewVoteResponse(optionId));
+      return;
+    }
+    root.innerHTML = `<div class="inner">${header(null)}<div class="loading">${T.tallying}</div></div>`;
+    postHeight();
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (forcedLocale) headers['Accept-Language'] = forcedLocale;
+      const res = await fetch(`/api/polls/${encodeURIComponent(pollId)}/vote`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ option_id: optionId }),
+      });
+      if (!res.ok) throw new Error('vote failed');
+      renderResults(poll, await res.json());
+    } catch (e) {
+      renderError(T.voteFailed);
+    }
+  }
+
+  async function loadPoll() {
+    if (PREVIEW) {
+      const res = await fetch(`/static/lockscreen-data/${encodeURIComponent(pollId)}.json`);
+      if (!res.ok) throw new Error('no snapshot');
+      snapshot = await res.json();
+      return snapshot.poll;
+    }
+    const inlineEl = document.getElementById('poll-data');
+    if (inlineEl) {
+      try { return JSON.parse(inlineEl.textContent); } catch (_) { /* fall through */ }
+    }
+    const res = await fetch(`/api/polls/${encodeURIComponent(pollId)}`);
+    if (!res.ok) throw new Error('poll not found');
+    return res.json();
+  }
+
+  async function boot() {
+    let poll;
+    try {
+      if (!pollId) throw new Error('no poll id');
+      poll = await loadPoll();
+    } catch (e) {
+      renderError(T.pollUnavailable);
+      return;
+    }
+    if (PREVIEW && startVoted) {
+      const target = startVoted === 'top' ? snapshot.default_option_id : startVoted;
+      if (poll.options.some(o => o.id === target)) {
+        renderResults(poll, previewVoteResponse(target));
+        return;
+      }
+    }
+    renderVote(poll);
+  }
+
+  // Let a parent page (the showcase) flip this widget between states without reloading.
+  window.addEventListener('message', (e) => {
+    if (!PREVIEW || !e.data || e.data.type !== 'opinary-preview' || !snapshot) return;
+    if (e.data.state === 'vote') renderVote(snapshot.poll);
+    else if (e.data.state === 'results') {
+      renderResults(snapshot.poll, previewVoteResponse(e.data.optionId || snapshot.default_option_id));
+    }
+  });
+
+  boot();
+  window.addEventListener('load', postHeight);
+  window.addEventListener('resize', () => { layoutRows(); postHeight(); });
+})();
+</script>
+</body>
+</html>

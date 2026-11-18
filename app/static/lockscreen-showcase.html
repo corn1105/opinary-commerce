@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lock-screen showcase</title>
+<!--
+  Proposal showcase: every active poll's COMPACT widget (widget-compact.html)
+  in its voted state, on a generic phone lock screen. Read-only — it never
+  casts a vote:
+    - compact widgets run in ?preview=1 mode (data from /static/lockscreen-data/,
+      votes simulated on screen only);
+    - "today's widget" comparison frames get their vote POST intercepted in the
+      browser and answered from the same snapshot, and are covered so nobody can
+      click them.
+  Refresh the data with: venv/bin/python scripts/build_lockscreen_snapshot.py
+-->
+<style>
+  :root {
+    --page: #111113;
+    --panel: #1b1b1e;
+    --text: #f2f2f2;
+    --muted: #9a9aa2;
+    --line: #2d2d32;
+    --ok: #3ecf72;
+    --bad: #ff5c5c;
+    --accent: #ff5a1f;
+    --s: 0.62;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--page); color: var(--text); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.45; }
+  a { color: inherit; }
+
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 20px 80px; }
+  h1 { font-size: 26px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 18px; margin: 44px 0 6px; }
+  .lede { color: var(--muted); max-width: 760px; margin: 0 0 18px; font-size: 15px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 16px; max-width: 760px; }
+
+  /* Controls */
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 0 0 20px; }
+  .ctl { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+  .seg button {
+    border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px;
+    padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--text); color: #111; font-weight: 600; }
+  .ctl input[type=range] { width: 120px; accent-color: var(--accent); }
+  .ctl label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+
+  /* Fit summary */
+  .summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px;
+    margin: 0 0 8px;
+  }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat .v { font-size: 26px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stat .v small { font-size: 14px; font-weight: 500; color: var(--muted); }
+  .stat .d { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .ok { color: var(--ok); }
+  .bad { color: var(--bad); }
+  .progress { font-size: 13px; color: var(--muted); min-height: 20px; }
+  .btn {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 999px;
+    font: inherit; font-size: 13px; padding: 6px 14px; cursor: pointer;
+  }
+  select.btn { padding-right: 10px; max-width: 100%; }
+
+  /* Phone grid */
+  .grid { display: flex; flex-wrap: wrap; gap: 28px 24px; }
+  .compare { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  figure { margin: 0; width: calc((var(--pw) + 24px) * var(--s)); }
+  figcaption { margin-top: 10px; font-size: 13px; }
+  figcaption .q { font-weight: 600; line-height: 1.3; }
+  figcaption .fit { color: var(--muted); font-size: 12px; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  figcaption .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+
+  /* Generic phone — no real brand, logo or OEM shape */
+  .phone {
+    zoom: var(--s);
+    position: relative;
+    width: calc(var(--pw) + 24px);
+    padding: 12px;
+    border-radius: 58px;
+    background: #1d1d20;
+    box-shadow: inset 0 0 0 2px #3a3a3f, inset 0 0 0 5px #0c0c0d, 0 30px 60px rgba(0, 0, 0, 0.5);
+  }
+  .phone::before, .phone::after { /* side buttons */
+    content: ''; position: absolute; width: 4px; border-radius: 2px; background: #2b2b2f;
+  }
+  .phone::before { right: -3px; top: 190px; height: 90px; }
+  .phone::after { left: -3px; top: 160px; height: 120px; }
+  .screen {
+    position: relative;
+    width: var(--pw);
+    height: var(--ph);
+    border-radius: 46px;
+    overflow: hidden;
+    color: #fff;
+  }
+  .cam { position: absolute; top: 13px; left: 50%; width: 13px; height: 13px; margin-left: -6.5px; border-radius: 50%; background: #050505; box-shadow: 0 0 0 2px rgba(255,255,255,0.06); z-index: 3; }
+  .status {
+    position: absolute; top: 12px; left: 30px; right: 26px; height: 18px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; font-weight: 600; z-index: 3;
+  }
+  .status .icons { display: flex; gap: 6px; align-items: center; }
+  .lockhead { position: absolute; top: 46px; left: 0; right: 0; text-align: center; text-shadow: 0 1px 12px rgba(0,0,0,0.25); }
+  .lockhead svg { display: block; margin: 0 auto 6px; opacity: 0.9; }
+  .lockhead .date { font-size: 17px; font-weight: 600; }
+  .lockhead .clock { font-size: 88px; font-weight: 300; line-height: 1; letter-spacing: -0.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .guide {
+    position: absolute; left: 0; right: 0; top: 25%; z-index: 4;
+    border-top: 2px dashed rgba(255, 255, 255, 0.9);
+    pointer-events: none;
+  }
+  .guide span {
+    position: absolute; right: 14px; top: -26px;
+    background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px; letter-spacing: 0.02em;
+  }
+  body.no-guide .guide { display: none; }
+  .notif {
+    position: absolute; top: 25%; left: 12px; right: 12px;
+    border-radius: 24px; overflow: hidden;
+    background: rgba(255, 255, 255, 0.8);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: blur(24px) saturate(1.6);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  }
+  .notif iframe { display: block; width: 100%; height: 300px; border: 0; background: transparent; }
+  .notif .shield { position: absolute; inset: 0; cursor: not-allowed; }
+  .homebar { position: absolute; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: rgba(255,255,255,0.75); z-index: 3; }
+  .overflow-note {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 120px; z-index: 2;
+    background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.85));
+    display: flex; align-items: flex-end; justify-content: center; padding-bottom: 22px;
+    font-size: 15px; font-weight: 700; text-align: center;
+  }
+
+  /* Abstract wallpapers */
+  .wp0 { background: radial-gradient(120% 80% at 15% 8%, #ffb36b 0%, transparent 55%), radial-gradient(100% 70% at 95% 45%, #ff4f8b 0%, transparent 60%), linear-gradient(160deg, #5b2a86 0%, #1d1747 100%); }
+  .wp1 { background: radial-gradient(90% 60% at 80% 12%, #6ee7f9 0%, transparent 60%), radial-gradient(100% 70% at 10% 70%, #2563eb 0%, transparent 65%), linear-gradient(180deg, #0b3a5b, #06162b); }
+  .wp2 { background: radial-gradient(90% 60% at 30% 15%, #9be15d 0%, transparent 55%), radial-gradient(90% 70% at 85% 75%, #00a389 0%, transparent 60%), linear-gradient(170deg, #12452f, #071a14); }
+  .wp3 { background: radial-gradient(80% 60% at 70% 15%, #c084fc 0%, transparent 60%), radial-gradient(90% 60% at 20% 80%, #f472b6 0%, transparent 60%), linear-gradient(180deg, #312e81, #0f0c29); }
+  .wp4 { background: radial-gradient(90% 60% at 25% 10%, #ffe0b2 0%, transparent 60%), radial-gradient(90% 70% at 80% 70%, #f59e0b 0%, transparent 65%), linear-gradient(170deg, #b45309, #3b1d0b); }
+  .wp5 { background: radial-gradient(70% 50% at 50% 25%, rgba(255, 90, 31, 0.6) 0%, transparent 60%), linear-gradient(180deg, #2a2a2e, #0b0b0d); }
+
+  /* Fit table */
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .tablewrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+
+  #measure-pool { position: fixed; left: -5000px; top: 0; visibility: hidden; pointer-events: none; }
+  #measure-pool iframe { border: 0; height: 900px; }
+
+  @media (max-width: 600px) {
+    .wrap { padding: 20px 16px 60px; }
+    h1 { font-size: 22px; }
+    :root { --s: 0.5; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Compact poll widget on the lock screen</h1>
+  <p class="lede">A proposal. After voting, the answers shrink to a slim strip (tap another answer to change your vote), and each product shows only picture, name, one price and one buy button. Everything a reader sees after voting must fit below the dashed line: 75% of the screen.</p>
+
+  <div class="controls">
+    <div class="ctl">Language
+      <span class="seg" id="ctl-locale"><button data-v="en" aria-pressed="true">English</button><button data-v="de" aria-pressed="false">Deutsch</button></span>
+    </div>
+    <div class="ctl">Show
+      <span class="seg" id="ctl-state"><button data-v="results" aria-pressed="true">After voting</button><button data-v="vote" aria-pressed="false">Before voting</button></span>
+    </div>
+    <div class="ctl">Phone
+      <span class="seg" id="ctl-size"><button data-v="big" aria-pressed="true">390 × 844</button><button data-v="small" aria-pressed="false">360 × 800</button></span>
+    </div>
+    <div class="ctl"><label><input type="checkbox" id="ctl-guide" checked> 75% line</label></div>
+    <div class="ctl">Size <input type="range" id="ctl-zoom" min="0.4" max="1" step="0.02" value="0.62"></div>
+  </div>
+
+  <div class="summary" id="summary">
+    <div class="stat"><div class="k">Polls that fit</div><div class="v" id="s-fit">…</div><div class="d" id="s-fit-d">measuring every answer</div></div>
+    <div class="stat"><div class="k">Tallest · 390 × 844</div><div class="v" id="s-big">…</div><div class="d">limit 633 px (75%)</div></div>
+    <div class="stat"><div class="k">Tallest · 360 × 800</div><div class="v" id="s-small">…</div><div class="d">limit 600 px (75%)</div></div>
+    <div class="stat"><div class="k">Before voting · 390 × 844</div><div class="v" id="s-vote">…</div><div class="d" id="s-vote-d">big buttons, same as today</div></div>
+    <div class="stat"><div class="k">Today's widget after voting</div><div class="v" id="s-today">…</div><div class="d" id="s-today-d">most popular answer, average</div></div>
+  </div>
+  <div class="progress"><span id="progress"></span> <button class="btn" id="remeasure" hidden>Measure again</button></div>
+
+  <h2>Today vs. proposal</h2>
+  <p class="sub" id="compare-sub"></p>
+  <div class="ctl" style="margin-bottom:14px">Poll <select class="btn" id="compare-pick"></select></div>
+  <div class="compare" id="compare"></div>
+
+  <h2 id="grid-title">Every active poll, after voting</h2>
+  <p class="sub" id="grid-sub"></p>
+  <div class="grid" id="grid"></div>
+
+  <h2>Fit check, answer by answer</h2>
+  <p class="sub">Every answer of every poll, in English and German, measured in the browser at the real widget width (screen minus 12 px on each side). Each "after voting" cell shows the tallest answer for that poll. "Before voting" is the first screen with the big answer buttons (tallest of English and German; today's widget in brackets).</p>
+  <div class="tablewrap"><table id="fit-table"><thead><tr>
+    <th>#</th><th>Poll</th>
+    <th class="num">English · 390 × 844</th><th class="num">German · 390 × 844</th>
+    <th class="num">Both · 360 × 800</th><th class="num">Before voting · 390 × 844</th><th class="num">Today's widget, after voting</th><th>Fits?</th>
+  </tr></thead><tbody></tbody></table></div>
+</div>
+<div id="measure-pool"></div>
+
+<script>
+(async function () {
+  const SIZES = { big: { w: 390, h: 844 }, small: { w: 360, h: 800 } };
+  const INSET = 12;                       // notification card inset from the screen edge
+  const LIMIT = (sz) => Math.floor(sz.h * 0.75);
+  const WIDGET_W = (sz) => sz.w - 2 * INSET;
+
+  // Settings can come from the address bar, e.g. ?lang=de&state=vote&phone=small&zoom=0.8
+  const P = new URLSearchParams(location.search);
+  let locale = P.get('lang') === 'de' ? 'de' : 'en';
+  let viewState = P.get('state') === 'vote' ? 'vote' : 'results';
+  let sizeKey = P.get('phone') === 'small' ? 'small' : 'big';
+  const zoom = parseFloat(P.get('zoom'));
+  if (zoom >= 0.3 && zoom <= 1.2) {
+    document.documentElement.style.setProperty('--s', zoom);
+    document.getElementById('ctl-zoom').value = zoom;
+  }
+  if (P.get('guide') === '0') {
+    document.body.classList.add('no-guide');
+    document.getElementById('ctl-guide').checked = false;
+  }
+  document.documentElement.lang = locale;
+  [['ctl-locale', locale], ['ctl-state', viewState], ['ctl-size', sizeKey]].forEach(([id, v]) => {
+    document.querySelectorAll(`#${id} button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  });
+
+  const index = await fetch('/static/lockscreen-data/index.json').then(r => r.json());
+  const polls = index.polls;
+  const snaps = {};
+  async function snap(id) {
+    if (!snaps[id]) snaps[id] = await fetch(`/static/lockscreen-data/${id}.json`).then(r => r.json());
+    return snaps[id];
+  }
+  const qText = (p) => ((p.translations || {})[locale] || {}).question || p.question;
+  const pct = (px, sz) => Math.round((px / sz.h) * 100);
+  const fmt = (px, sz) => `${px.toLocaleString('en-US')} px · ${pct(px, sz)}%`;
+
+  const BUST = String(Date.now());   // always load the newest widget file, never a cached copy
+  function compactUrl(id, opts) {
+    const q = new URLSearchParams({ poll: id, preview: '1', locale: opts.locale || locale, theme: 'glass', v: BUST });
+    if (opts.voted) q.set('voted', opts.voted);
+    if (opts.measure) q.set('measure', '1');
+    if (opts.tag) q.set('tag', opts.tag);
+    return `/static/widget-compact.html?${q}`;
+  }
+
+  // ---------- Phone mockup ----------
+  const ICONS = `
+    <svg width="17" height="11" viewBox="0 0 17 11" fill="#fff" aria-hidden="true"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+    <svg width="15" height="11" viewBox="0 0 15 11" fill="#fff" aria-hidden="true"><path d="M7.5 2.2c2.2 0 4.2.9 5.7 2.3l1.3-1.3A9.9 9.9 0 0 0 7.5.4 9.9 9.9 0 0 0 .5 3.2l1.3 1.3a8.1 8.1 0 0 1 5.7-2.3Zm0 3.4c1.3 0 2.4.5 3.3 1.3l1.3-1.3a6.5 6.5 0 0 0-9.2 0l1.3 1.3c.9-.8 2-1.3 3.3-1.3Zm0 3.4c-.5 0-.9.2-1.3.5L7.5 11l1.3-1.5c-.4-.3-.8-.5-1.3-.5Z"/></svg>
+    <svg width="26" height="12" viewBox="0 0 26 12" aria-hidden="true"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="#fff" opacity=".6"/><rect x="2" y="2" width="16" height="8" rx="1.6" fill="#fff"/><rect x="23.5" y="4" width="2" height="4" rx="1" fill="#fff" opacity=".6"/></svg>`;
+  const LOCK = `<svg width="14" height="18" viewBox="0 0 14 18" fill="#fff" aria-hidden="true"><path d="M3 7V5a4 4 0 0 1 8 0v2h.5A2.5 2.5 0 0 1 14 9.5v6a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 0 15.5v-6A2.5 2.5 0 0 1 2.5 7H3Zm1.8 0h4.4V5a2.2 2.2 0 0 0-4.4 0v2Z"/></svg>`;
+
+  function timeText() {
+    return new Date().toLocaleTimeString(locale === 'de' ? 'de-DE' : 'en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  function dateText() {
+    return new Date().toLocaleDateString(locale === 'de' ? 'de-DE' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+
+  function makePhone(wallpaper) {
+    const phone = document.createElement('div');
+    phone.className = 'phone';
+    phone.innerHTML = `
+      <div class="screen wp${wallpaper % 6}">
+        <div class="cam"></div>
+        <div class="status"><span></span><span class="icons">${ICONS}</span></div>
+        <div class="lockhead">${LOCK}<div class="date"></div><div class="clock"></div></div>
+        <div class="guide"><span>75% of screen ↓</span></div>
+        <div class="notif"></div>
+        <div class="homebar"></div>
+      </div>`;
+    return phone;
+  }
+  function refreshClocks() {
+    document.querySelectorAll('.lockhead .date').forEach(el => { el.textContent = dateText(); });
+    document.querySelectorAll('.lockhead .clock').forEach(el => { el.textContent = timeText(); });
+  }
+  function applySize() {
+    const sz = SIZES[sizeKey];
+    document.documentElement.style.setProperty('--pw', sz.w + 'px');
+    document.documentElement.style.setProperty('--ph', sz.h + 'px');
+  }
+
+  // ---------- Live phones (grid + compare) ----------
+  const frames = new Map();   // contentWindow -> { iframe, fitEl, kind, sz }
+
+  window.addEventListener('message', (e) => {
+    if (!e.data || e.data.type !== 'opinary-height') return;
+    const rec = frames.get(e.source);
+    if (!rec) return;
+    rec.iframe.style.height = e.data.height + 'px';
+    if (rec.kind === 'compact' && rec.nowEl) {
+      const sz = SIZES[sizeKey];
+      const h = e.data.cardHeight;
+      const ok = h <= LIMIT(sz);
+      rec.nowEl.innerHTML = `On screen now: <span class="${ok ? 'ok' : 'bad'}">${fmt(h, sz)} ${ok ? '✓' : '✗'}</span>`;
+    }
+  });
+
+  function gridTitles() {
+    const before = viewState === 'vote';
+    document.getElementById('grid-title').textContent = `Every active poll, ${before ? 'before' : 'after'} voting`;
+    document.getElementById('grid-sub').textContent = before
+      ? 'Tap an answer inside a phone to see the voted state. Votes here are simulated on screen; nothing is sent to the server.'
+      : "Each phone opens on the poll's most popular answer. Tap another answer inside a phone to change the vote; nothing is sent to the server.";
+  }
+
+  function buildGrid() {
+    gridTitles();
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    polls.forEach((p, i) => {
+      const fig = document.createElement('figure');
+      const phone = makePhone(i);
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('scrolling', 'no');
+      iframe.title = p.question;
+      iframe.src = compactUrl(p.id, { voted: viewState === 'results' ? 'top' : null });
+      phone.querySelector('.notif').appendChild(iframe);
+      const cap = document.createElement('figcaption');
+      cap.innerHTML = `<div class="q"></div><div class="fit now">…</div><div class="fit max" data-id="${p.id}"></div>`;
+      cap.querySelector('.q').textContent = `${i + 1}. ${qText(p)}`;
+      fig.append(phone, cap);
+      grid.appendChild(fig);
+      // An iframe's contentWindow stays the same object across navigations, so
+      // registering it now catches even the widget's very first height message.
+      frames.set(iframe.contentWindow, { iframe, kind: 'compact', nowEl: cap.querySelector('.now') });
+    });
+    refreshClocks();
+    renderMaxLabels();
+  }
+
+  // Today's widget, voted, without voting: the vote POST is answered in the
+  // browser from the snapshot. Nothing reaches the server.
+  function fakeVoteResponse(s, loc, optionId) {
+    const L = s.locales[loc] || s.locales.en;
+    return {
+      results: L.results.map(r => Object.assign({}, r, { count: r.count + (r.option_id === optionId ? 1 : 0), is_user_choice: r.option_id === optionId })),
+      total: L.total + 1,
+      by_option: L.by_option,
+      voted_option_id: optionId,
+      locale: loc,
+    };
+  }
+  function interceptVotes(win, s, loc) {
+    const realFetch = win.fetch.bind(win);
+    const fake = function (url, opts) {
+      if (opts && String(opts.method || 'GET').toUpperCase() !== 'GET') {
+        const body = JSON.parse(opts.body || '{}');
+        const payload = JSON.stringify(fakeVoteResponse(s, loc, body.option_id));
+        return Promise.resolve(new win.Response(payload, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return realFetch(url, opts);
+    };
+    win.fetch = fake;
+    return win.fetch === fake;
+  }
+  // Loads today's widget in `iframe`, fakes a vote for `optionId`, resolves once rendered.
+  function loadTodayVoted(iframe, id, loc, optionId) {
+    return new Promise(async (resolve) => {
+      const s = await snap(id);
+      const done = () => {
+        const win = iframe.contentWindow;
+        if (!win || !String(win.location.pathname).startsWith('/widget/')) return;   // about:blank etc.
+        iframe.removeEventListener('load', done);
+        const btn = iframe.contentDocument && iframe.contentDocument.querySelector(`.opt-vote[data-id="${optionId}"]`);
+        if (!btn || !interceptVotes(win, s, loc)) { resolve(null); return; }   // never click without the intercept
+        btn.click();
+        const t0 = Date.now();
+        (function poll() {
+          const doc = iframe.contentDocument;
+          if (doc && doc.querySelector('.opts-results')) {
+            setTimeout(() => resolve(Math.ceil(doc.getElementById('root').getBoundingClientRect().height)), 60);
+          } else if (Date.now() - t0 < 5000) setTimeout(poll, 50);
+          else resolve(null);
+        })();
+      };
+      iframe.addEventListener('load', done);
+      iframe.src = `/widget/${encodeURIComponent(id)}?locale=${loc}`;
+    });
+  }
+
+  async function buildCompare() {
+    document.getElementById('compare-sub').textContent = viewState === 'vote'
+      ? "The same poll before voting, on the same 390 × 844 phone: the question and answer buttons stay as big as today. Today's widget is shown frozen; it can't be clicked here."
+      : "The same poll and the same answer after voting, on the same 390 × 844 phone. Today's widget is shown frozen; it can't be clicked here.";
+    const pick = document.getElementById('compare-pick');
+    const id = pick.value;
+    const p = polls.find(x => x.id === id);
+    const s = await snap(id);
+    const sz = SIZES.big;
+    const box = document.getElementById('compare');
+    box.innerHTML = '';
+
+    // Today
+    const figA = document.createElement('figure');
+    const phoneA = makePhone(5);
+    const notifA = phoneA.querySelector('.notif');
+    notifA.style.background = 'transparent';
+    notifA.style.backdropFilter = notifA.style.webkitBackdropFilter = 'none';
+    notifA.style.borderRadius = '0';
+    const ifA = document.createElement('iframe');
+    ifA.setAttribute('scrolling', 'no');
+    ifA.title = 'Today’s widget';
+    notifA.appendChild(ifA);
+    const shield = document.createElement('div');
+    shield.className = 'shield';
+    notifA.appendChild(shield);
+    const capA = document.createElement('figcaption');
+    capA.innerHTML = `<div class="tag" style="color:var(--bad)">Today</div><div class="fit todayfit">measuring…</div>`;
+    figA.append(phoneA, capA);
+
+    // Proposal
+    const figB = document.createElement('figure');
+    const phoneB = makePhone(5);
+    const ifB = document.createElement('iframe');
+    ifB.setAttribute('scrolling', 'no');
+    ifB.title = 'Compact widget';
+    const before = viewState === 'vote';
+    ifB.src = compactUrl(id, { voted: before ? null : s.default_option_id });
+    phoneB.querySelector('.notif').appendChild(ifB);
+    const capB = document.createElement('figcaption');
+    capB.innerHTML = `<div class="tag" style="color:var(--ok)">Proposal</div><div class="fit now">…</div>`;
+    figB.append(phoneB, capB);
+    box.append(figA, figB);
+    frames.set(ifB.contentWindow, { iframe: ifB, kind: 'compact', nowEl: capB.querySelector('.now') });
+    frames.set(ifA.contentWindow, { iframe: ifA, kind: 'today' });
+    refreshClocks();
+
+    // The compare phones always use the 390 x 844 screen.
+    [phoneA, phoneB].forEach(ph => { ph.style.setProperty('--pw', sz.w + 'px'); ph.style.setProperty('--ph', sz.h + 'px'); });
+    figA.style.setProperty('--pw', sz.w + 'px'); figB.style.setProperty('--pw', sz.w + 'px');
+
+    const h = before
+      ? await loadTodayVoteState(ifA, id, locale)
+      : await loadTodayVoted(ifA, id, locale, s.default_option_id);
+    if (h) {
+      const over = h > LIMIT(sz);
+      capA.querySelector('.todayfit').innerHTML = `<span class="${over ? 'bad' : 'ok'}">${fmt(h, sz)} ${over ? '✗' : '✓'}</span> of the screen`;
+      if (h > sz.h - sz.h * 0.25) {
+        const note = document.createElement('div');
+        note.className = 'overflow-note';
+        note.textContent = `↓ continues — ${h.toLocaleString('en-US')} px in total`;
+        phoneA.querySelector('.screen').appendChild(note);
+      }
+    } else {
+      capA.querySelector('.todayfit').textContent = 'could not render';
+    }
+  }
+
+  // ---------- Measurement ----------
+  // fit[id][loc][sizeKey] = { max, maxOption, heights: {optionId: px} }; today[id][loc] = px
+  const fit = {};
+  const today = {};
+  const voteFit = {};     // voteFit[id][loc][size] = px, first screen (before voting)
+  const todayVote = {};   // todayVote[id][loc] = px, today's widget first screen
+  window.__fit = { fit, today, voteFit, todayVote };
+
+  // Today's widget before voting: just load it (a read-only page load) and measure.
+  function loadTodayVoteState(iframe, id, loc) {
+    return new Promise((resolve) => {
+      const done = () => {
+        const win = iframe.contentWindow;
+        if (!win || !String(win.location.pathname).startsWith('/widget/')) return;
+        iframe.removeEventListener('load', done);
+        const root = iframe.contentDocument.getElementById('root');
+        resolve(root && iframe.contentDocument.querySelector('.opts-vote') ? Math.ceil(root.getBoundingClientRect().height) : null);
+      };
+      iframe.addEventListener('load', done);
+      iframe.src = `/widget/${encodeURIComponent(id)}?locale=${loc}`;
+    });
+  }
+
+  let tagSeq = 0;
+  function measureCompact(iframe, job) {
+    return new Promise((resolve) => {
+      const sz = SIZES[job.size];
+      const tag = 'm' + (++tagSeq);
+      const want = job.state || 'results';
+      iframe.style.width = WIDGET_W(sz) + 'px';
+      let timer;
+      const onMsg = (e) => {
+        if (!e.data || e.data.type !== 'opinary-height' || e.data.tag !== tag || e.data.state !== want) return;
+        window.removeEventListener('message', onMsg);
+        clearTimeout(timer);
+        resolve(e.data.cardHeight);
+      };
+      window.addEventListener('message', onMsg);
+      timer = setTimeout(() => { window.removeEventListener('message', onMsg); resolve(null); }, 10000);
+      iframe.src = compactUrl(job.id, { voted: want === 'results' ? job.option : null, locale: job.loc, measure: true, tag });
+    });
+  }
+
+  async function runPool(jobs, workers, fn) {
+    const pool = document.getElementById('measure-pool');
+    let next = 0;
+    async function worker() {
+      const iframe = document.createElement('iframe');
+      pool.appendChild(iframe);
+      while (next < jobs.length) {
+        const job = jobs[next++];
+        job.result = await fn(iframe, job);
+        tick();
+      }
+      iframe.remove();
+    }
+    await Promise.all(Array.from({ length: workers }, worker));
+  }
+
+  let doneCount = 0, totalCount = 0;
+  function tick() {
+    doneCount++;
+    document.getElementById('progress').textContent = `Measuring ${doneCount} of ${totalCount} renders…`;
+  }
+
+  async function measureAll() {
+    document.getElementById('remeasure').hidden = true;
+    for (const k of Object.keys(fit)) delete fit[k];
+    for (const k of Object.keys(today)) delete today[k];
+    for (const k of Object.keys(voteFit)) delete voteFit[k];
+    for (const k of Object.keys(todayVote)) delete todayVote[k];
+    const compactJobs = [];
+    const todayJobs = [];
+    for (const p of polls) {
+      const s = await snap(p.id);
+      for (const loc of ['en', 'de']) {
+        for (const o of s.poll.options) {
+          for (const size of ['big', 'small']) compactJobs.push({ id: p.id, loc, option: o.id, size });
+        }
+        for (const size of ['big', 'small']) compactJobs.push({ id: p.id, loc, size, state: 'vote' });
+        todayJobs.push({ id: p.id, loc, option: s.default_option_id });
+        todayJobs.push({ id: p.id, loc, state: 'vote' });
+      }
+    }
+    doneCount = 0;
+    totalCount = compactJobs.length + todayJobs.length;
+    await runPool(compactJobs, 6, measureCompact);
+    await runPool(todayJobs, 3, async (iframe, job) => {
+      iframe.style.width = WIDGET_W(SIZES.big) + 'px';
+      return job.state === 'vote'
+        ? loadTodayVoteState(iframe, job.id, job.loc)
+        : loadTodayVoted(iframe, job.id, job.loc, job.option);
+    });
+
+    for (const j of compactJobs) {
+      if (j.state === 'vote') {
+        const v = ((voteFit[j.id] = voteFit[j.id] || {})[j.loc] = voteFit[j.id][j.loc] || {});
+        v[j.size] = j.result;
+        continue;
+      }
+      const slot = ((fit[j.id] = fit[j.id] || {})[j.loc] = fit[j.id][j.loc] || {});
+      const cell = (slot[j.size] = slot[j.size] || { max: 0, maxOption: null, heights: {}, missing: 0 });
+      if (j.result == null) { cell.missing++; continue; }
+      cell.heights[j.option] = j.result;
+      if (j.result > cell.max) { cell.max = j.result; cell.maxOption = j.option; }
+    }
+    for (const j of todayJobs) {
+      const bucket = j.state === 'vote' ? todayVote : today;
+      (bucket[j.id] = bucket[j.id] || {})[j.loc] = j.result;
+    }
+
+    const failed = compactJobs.filter(j => j.result == null).length + todayJobs.filter(j => j.result == null).length;
+    const nVote = compactJobs.filter(j => j.state === 'vote').length;
+    document.getElementById('progress').textContent =
+      `Measured ${compactJobs.length - nVote} after-voting renders (every answer × English/German × 2 phone sizes), ${nVote} before-voting renders, and ${todayJobs.length} renders of today's widget.` +
+      (failed ? ` ${failed} renders failed.` : '');
+    document.getElementById('remeasure').hidden = false;
+    renderSummary();
+    renderTable();
+    renderMaxLabels();
+  }
+
+  function cellMax(id, size, locs) {
+    let best = null;
+    for (const loc of locs) {
+      const c = fit[id] && fit[id][loc] && fit[id][loc][size];
+      if (c && (best == null || c.max > best)) best = c.max;
+    }
+    return best;
+  }
+  function voteMax(id, size) {
+    let best = null;
+    for (const loc of ['en', 'de']) {
+      const v = voteFit[id] && voteFit[id][loc] && voteFit[id][loc][size];
+      if (v != null && (best == null || v > best)) best = v;
+    }
+    return best;
+  }
+  function pollFits(id) {
+    return ['big', 'small'].every(size => {
+      const sz = SIZES[size];
+      const vm = voteMax(id, size);
+      return vm != null && vm <= LIMIT(sz) && ['en', 'de'].every(loc => {
+        const c = fit[id] && fit[id][loc] && fit[id][loc][size];
+        return c && !c.missing && c.max <= LIMIT(sz);
+      });
+    });
+  }
+
+  function renderSummary() {
+    const nFit = polls.filter(p => pollFits(p.id)).length;
+    const el = document.getElementById('s-fit');
+    el.innerHTML = `<span class="${nFit === polls.length ? 'ok' : 'bad'}">${nFit} / ${polls.length}</span>`;
+    document.getElementById('s-fit-d').textContent = 'before and after voting, every answer, English + German, both phones';
+    {
+      const sz = SIZES.big;
+      let vmax = 0, tmax = 0;
+      polls.forEach(p => {
+        vmax = Math.max(vmax, voteMax(p.id, 'big') || 0);
+        ['en', 'de'].forEach(loc => { tmax = Math.max(tmax, (todayVote[p.id] && todayVote[p.id][loc]) || 0); });
+      });
+      document.getElementById('s-vote').innerHTML =
+        `<span class="${vmax <= LIMIT(sz) ? 'ok' : 'bad'}">${vmax} px</span> <small>${pct(vmax, sz)}% of screen</small>`;
+      document.getElementById('s-vote-d').textContent = `tallest; today's first screen: ${tmax} px (${pct(tmax, sz)}%)`;
+    }
+    for (const size of ['big', 'small']) {
+      const sz = SIZES[size];
+      let max = 0;
+      polls.forEach(p => { max = Math.max(max, cellMax(p.id, size, ['en', 'de']) || 0); });
+      document.getElementById(size === 'big' ? 's-big' : 's-small').innerHTML =
+        `<span class="${max <= LIMIT(sz) ? 'ok' : 'bad'}">${max} px</span> <small>${pct(max, sz)}% of screen</small>`;
+    }
+    const vals = [];
+    polls.forEach(p => ['en', 'de'].forEach(loc => { const v = today[p.id] && today[p.id][loc]; if (v) vals.push(v); }));
+    if (vals.length) {
+      const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+      const sz = SIZES.big;
+      document.getElementById('s-today').innerHTML = `<span class="bad">${avg.toLocaleString('en-US')} px</span> <small>${pct(avg, sz)}% of screen</small>`;
+      document.getElementById('s-today-d').textContent = `average; tallest ${Math.max(...vals).toLocaleString('en-US')} px (${pct(Math.max(...vals), sz)}%)`;
+    }
+  }
+
+  function renderTable() {
+    const tb = document.querySelector('#fit-table tbody');
+    tb.innerHTML = '';
+    const big = SIZES.big, small = SIZES.small;
+    polls.forEach((p, i) => {
+      const en = cellMax(p.id, 'big', ['en']);
+      const de = cellMax(p.id, 'big', ['de']);
+      const sm = cellMax(p.id, 'small', ['en', 'de']);
+      const td = today[p.id] && today[p.id].en;
+      const vm = voteMax(p.id, 'big');
+      const tv = Math.max((todayVote[p.id] && todayVote[p.id].en) || 0, (todayVote[p.id] && todayVote[p.id].de) || 0) || null;
+      const cls = (v, sz) => v == null ? '' : (v <= LIMIT(sz) ? 'ok' : 'bad');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td><td class="pq"></td>
+        <td class="num ${cls(en, big)}">${en == null ? '—' : fmt(en, big)}</td>
+        <td class="num ${cls(de, big)}">${de == null ? '—' : fmt(de, big)}</td>
+        <td class="num ${cls(sm, small)}">${sm == null ? '—' : fmt(sm, small)}</td>
+        <td class="num ${cls(vm, big)}">${vm == null ? '—' : fmt(vm, big)}<span style="color:var(--muted)">${tv ? ` (today ${tv})` : ''}</span></td>
+        <td class="num ${cls(td, big)}">${td == null ? '—' : fmt(td, big)}</td>
+        <td>${pollFits(p.id) ? '<span class="ok">✓ fits</span>' : '<span class="bad">✗ too tall</span>'}</td>`;
+      tr.querySelector('.pq').textContent = p.question;
+      tb.appendChild(tr);
+    });
+  }
+
+  function renderMaxLabels() {
+    const sz = SIZES[sizeKey];
+    document.querySelectorAll('figcaption .max').forEach(el => {
+      const m = cellMax(el.dataset.id, sizeKey, [locale]);
+      if (m == null) { el.textContent = ''; return; }
+      const ok = m <= LIMIT(sz);
+      el.innerHTML = `Tallest after voting: <span class="${ok ? 'ok' : 'bad'}">${fmt(m, sz)} ${ok ? '✓' : '✗'}</span>`;
+    });
+  }
+
+  // ---------- Controls ----------
+  function seg(id, onChange) {
+    const box = document.getElementById(id);
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      box.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      onChange(b.dataset.v);
+    });
+  }
+  seg('ctl-locale', (v) => { locale = v; document.documentElement.lang = v; frames.clear(); buildGrid(); buildCompare(); });
+  seg('ctl-state', (v) => {
+    viewState = v;
+    gridTitles();
+    buildCompare();
+    document.querySelectorAll('#grid iframe').forEach(f => {
+      f.contentWindow.postMessage({ type: 'opinary-preview', state: v }, '*');
+    });
+  });
+  seg('ctl-size', (v) => { sizeKey = v; applySize(); renderMaxLabels(); });
+  document.getElementById('ctl-guide').addEventListener('change', (e) => document.body.classList.toggle('no-guide', !e.target.checked));
+  document.getElementById('ctl-zoom').addEventListener('input', (e) => document.documentElement.style.setProperty('--s', e.target.value));
+  document.getElementById('remeasure').addEventListener('click', measureAll);
+
+  const pick = document.getElementById('compare-pick');
+  polls.forEach((p, i) => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = `${i + 1}. ${p.question}`;
+    pick.appendChild(o);
+  });
+  const mattress = polls.find(p => /mattress/i.test(p.question));
+  if (mattress) pick.value = mattress.id;
+  pick.addEventListener('change', buildCompare);
+
+  applySize();
+  buildGrid();
+  buildCompare();
+  setInterval(refreshClocks, 30000);
+  measureAll();
+})();
+</script>
+</body>
+</html>

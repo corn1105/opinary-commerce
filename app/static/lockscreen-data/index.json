@@ -1,0 +1,309 @@
+{
+ "generated_at": "2026-11-18T17:32:14+00:00",
+ "polls": [
+  {
+   "id": "369c3184-1dbb-4ceb-a142-5f62e195afd9",
+   "question": "What does your workout routine look like right now?",
+   "translations": {},
+   "publisher_name": "Guardian"
+  },
+  {
+   "id": "33021a8d-ff34-4482-832e-a3051b32361e",
+   "question": "How many hours sleep do you need?",
+   "translations": {},
+   "publisher_name": "Health"
+  },
+  {
+   "id": "dc314590-acf0-43b3-b898-c68beb809bdc",
+   "question": "Welche nachhaltige Schuhmarke passt am besten zu dir? 👟🌱",
+   "translations": {},
+   "publisher_name": "https://utopia.de/"
+  },
+  {
+   "id": "5e748f6a-40d2-45f8-85a5-ac60e2b1111f",
+   "question": "What's your biggest skin concern?",
+   "translations": {
+    "de": {
+     "question": "Was beschäftigt Sie an Ihrer Haut am meisten?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": "Evoke"
+  },
+  {
+   "id": "1798d051-20a4-403d-8813-6c61c4afd3fd",
+   "question": "Which SPF do you reach for?",
+   "translations": {
+    "de": {
+     "question": "Zu welchem Lichtschutzfaktor greifen Sie normalerweise?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": "Evoke"
+  },
+  {
+   "id": "804c7bf8-4e57-4ee3-8a9b-abcc2a9ea3c5",
+   "question": "Gym or home workouts?",
+   "translations": {
+    "de": {
+     "question": "Fitnessstudio oder zuhause trainieren?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "e5479266-cd80-4c2c-a8ee-1f0b3a4351d6",
+   "question": "What does your dog or cat eat?",
+   "translations": {
+    "de": {
+     "question": "Was frisst Ihr Hund oder Ihre Katze eigentlich?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": "Tag24"
+  },
+  {
+   "id": "7f82fb3b-bc3a-4fc7-a5dd-975119a39b37",
+   "question": "When did you last replace your main bike?",
+   "translations": {
+    "de": {
+     "question": "Wann haben Sie Ihr Rad zuletzt ersetzt?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "5b2923e8-10f1-42db-8de1-b5af44e1c10c",
+   "question": "Do you wear SPF daily?",
+   "translations": {
+    "de": {
+     "question": "Cremen Sie sich täglich mit Sonnenschutz ein?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "31c466e6-015a-4f19-aa7a-214d5a3b4313",
+   "question": "How's the air in your bedroom?",
+   "translations": {
+    "de": {
+     "question": "Wie ist die Luft in Ihrem Schlafzimmer, ehrlich gesagt?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "eb8bbc4f-6965-4f3a-8a93-519aa26145f0",
+   "question": "How many unread books are on your nightstand?",
+   "translations": {
+    "de": {
+     "question": "Wie viele ungelesene Bücher liegen auf Ihrem Nachttisch?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "fc761120-5102-4a7c-8f0e-168a2eb6b490",
+   "question": "How did you lose or break your last pair of sunglasses?",
+   "translations": {
+    "de": {
+     "question": "Wie sind Ihre letzten Sonnenbrillen verloren gegangen oder zerbrochen?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "df173ccb-e636-4968-9803-95cedc20a989",
+   "question": "Gas, charcoal, or pellet grill?",
+   "translations": {
+    "de": {
+     "question": "Gas, Holzkohle oder Pelletgrill?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "2b6575af-2ac8-490e-a93d-364878ee981b",
+   "question": "Are you training for something?",
+   "translations": {
+    "de": {
+     "question": "Trainieren Sie gerade auf ein Ziel hin?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "e113e145-210c-44f3-83f4-736010665fac",
+   "question": "How big is your living-room TV?",
+   "translations": {
+    "de": {
+     "question": "Wie groß ist Ihr Fernseher?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "f4a86a8a-7d8c-4665-82bf-ba69ab96d3ed",
+   "question": "When did your energy bill last shock you?",
+   "translations": {
+    "de": {
+     "question": "Wann hat Sie Ihre Stromrechnung zuletzt geschockt?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "ac540b1f-fc81-4822-941e-306da8fde58e",
+   "question": "How often do you vacuum?",
+   "translations": {
+    "de": {
+     "question": "Wie oft saugen Sie?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "34390375-f77e-4134-b33d-6d149b788a74",
+   "question": "How sharp is your chef's knife?",
+   "translations": {
+    "de": {
+     "question": "Wie scharf ist Ihr Kochmesser?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "cf4db86d-4f0f-4b95-9d48-ccb7e17727e9",
+   "question": "Has a package ever been stolen from your porch?",
+   "translations": {
+    "de": {
+     "question": "Wurde Ihnen schon einmal ein Paket vor der Tür gestohlen?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "ab8df30f-478a-45a5-b77e-683dc06748bd",
+   "question": "How's your back at the end of a workday?",
+   "translations": {
+    "de": {
+     "question": "Wie ist Ihr Rücken am Ende des Arbeitstags?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "00ae2b55-ce68-4786-8f44-b723a88e4d74",
+   "question": "Carry-on only, or do you check a bag?",
+   "translations": {
+    "de": {
+     "question": "Handgepäck oder Koffer aufgeben?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "9cce8d26-54c4-432d-be0b-2eb20d8cd009",
+   "question": "Home coffee or café coffee?",
+   "translations": {
+    "de": {
+     "question": "Kaffee zu Hause oder im Café?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "bf393ca1-4163-46e2-a4a0-3e1e88f6476e",
+   "question": "When did you last upgrade your headphones?",
+   "translations": {
+    "de": {
+     "question": "Wann haben Sie zuletzt neue Kopfhörer gekauft?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "f15ba3c4-779b-4fbc-a2d2-eab05692b247",
+   "question": "How old is your mattress?",
+   "translations": {
+    "de": {
+     "question": "Wie alt ist Ihre Matratze?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  },
+  {
+   "id": "251d0db1-0bc9-4fb8-9525-c9b72b9dd876",
+   "question": "How many miles do you run a week?",
+   "translations": {
+    "de": {
+     "question": "Wie viele Kilometer laufen Sie pro Woche?"
+    },
+    "en": {
+     "_polished": true
+    }
+   },
+   "publisher_name": null
+  }
+ ]
+}
