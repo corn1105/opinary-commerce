@@ -1,13 +1,17 @@
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.routes.admin import router as admin_router
 from app.routes.public import router as public_router
+from app.services import poll_service
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="OpinaryCommerce", version="0.1.1")
 
@@ -48,6 +52,22 @@ app.include_router(admin_router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": app.version}
+
+
+@app.get("/health/db")
+async def health_db():
+    """Touch the database once. Called daily by the keep-db-awake GitHub job.
+
+    Kept separate from /health so a database outage never makes Railway think
+    the app itself is dead. Returns 503 when the database is unreachable, so the
+    job fails and GitHub emails the repo owner.
+    """
+    try:
+        await poll_service.ping_db()
+    except Exception as e:
+        logger.warning("health/db: database unreachable: %s", e)
+        return JSONResponse({"status": "error", "db": "down"}, status_code=503)
+    return {"status": "ok", "db": "ok"}
 
 
 @app.get("/", response_class=HTMLResponse)

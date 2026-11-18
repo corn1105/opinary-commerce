@@ -39,6 +39,16 @@ def _cache_bust(poll_id: str) -> None:
     _poll_cache.pop(poll_id, None)
 
 
+async def ping_db() -> None:
+    """Cheapest real query; raises if the database is unreachable.
+
+    Backs /health/db, which .github/workflows/keep-db-awake.yml calls daily so
+    Supabase's free tier never sees the project as idle (it auto-pauses after
+    7 quiet days, taking the whole site down).
+    """
+    get_db().table("polls").select("id").limit(1).execute()
+
+
 # Supabase returns at most 1000 rows per request by default.
 _PAGE_SIZE = 1000
 
