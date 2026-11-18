@@ -25,6 +25,8 @@
     &locale=en|de     force language
     &preview=1        read-only: data comes from /static/lockscreen-data/<id>.json,
                       votes are simulated on screen and NEVER sent to the server
+    &preview=admin    same, but live data from /admin/api/polls/<id>/preview
+                      (needs the admin login cookie; used by the admin page)
     &voted=<id>|top   (preview only) open straight in the voted state
     &theme=glass      transparent card for a frosted lock-screen container
     &measure=1        no images, no animation — used by the showcase's fit check
@@ -322,6 +324,7 @@
   const pollId = params.get('poll') || (lastSeg.endsWith('.html') ? null : lastSeg);
   const forcedLocale = params.get('locale');
   const PREVIEW = params.has('preview');
+  const PREVIEW_ADMIN = params.get('preview') === 'admin';
   const MEASURE = params.has('measure');
   const startVoted = params.get('voted');
   if (params.get('theme') === 'glass') document.documentElement.classList.add('glass');
@@ -520,7 +523,7 @@
   let snapshot = null;  // preview mode only
 
   function previewVoteResponse(optionId) {
-    const loc = snapshot.locales[forcedLocale] || snapshot.locales.en;
+    const loc = snapshot.locales[forcedLocale] || snapshot.locales.en || Object.values(snapshot.locales)[0];
     return {
       results: loc.results.map(r => Object.assign({}, r, { count: r.count + (r.option_id === optionId ? 1 : 0) })),
       total: loc.total + 1,
@@ -554,7 +557,9 @@
 
   async function loadPoll() {
     if (PREVIEW) {
-      const res = await fetch(`/static/lockscreen-data/${encodeURIComponent(pollId)}.json`);
+      const res = await fetch(PREVIEW_ADMIN
+        ? `/admin/api/polls/${encodeURIComponent(pollId)}/preview?locale=${encodeURIComponent(forcedLocale || 'en')}`
+        : `/static/lockscreen-data/${encodeURIComponent(pollId)}.json`);
       if (!res.ok) throw new Error('no snapshot');
       snapshot = await res.json();
       return snapshot.poll;

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone preview</title>
+<!--
+  ONE poll's compact widget on a generic phone lock screen, scaled to fit
+  whatever space it gets. Used by the admin page for the poll-card thumbnail,
+  the interactive preview window and "Open in new tab".
+
+  Read-only: the widget runs in preview mode, so votes are simulated on screen
+  and never sent to the server.
+
+  URL parameters:
+    ?poll=<id>          required
+    &locale=en|de       language (default en)
+    &state=vote|results start before voting (default) or on the most popular answer
+    &src=admin|snapshot admin = live data via the admin login (default);
+                        snapshot = /static/lockscreen-data (no login needed)
+    &guide=1            show the dashed 75%-of-screen line
+    &pad=<px>           space around the phone (default 8 inside a frame, 24 full page)
+    &v=<anything>       cache-buster, passed on to the widget
+-->
+<style>
+  :root { --s: 1; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  html.top body { background: radial-gradient(80% 60% at 50% 40%, #2a2a2f 0%, #111113 70%); }
+
+  /* Generic phone — no real brand, logo or OEM shape */
+  .phone {
+    zoom: var(--s);
+    position: relative;
+    flex-shrink: 0;
+    width: 414px;
+    padding: 12px;
+    border-radius: 58px;
+    background: #1d1d20;
+    box-shadow: inset 0 0 0 2px #3a3a3f, inset 0 0 0 5px #0c0c0d, 0 24px 50px rgba(0, 0, 0, 0.35);
+  }
+  .phone::before, .phone::after { content: ''; position: absolute; width: 4px; border-radius: 2px; background: #2b2b2f; }
+  .phone::before { right: -3px; top: 190px; height: 90px; }
+  .phone::after { left: -3px; top: 160px; height: 120px; }
+  .screen { position: relative; width: 390px; height: 844px; border-radius: 46px; overflow: hidden; color: #fff; }
+  .cam { position: absolute; top: 13px; left: 50%; width: 13px; height: 13px; margin-left: -6.5px; border-radius: 50%; background: #050505; z-index: 3; }
+  .status { position: absolute; top: 12px; left: 30px; right: 26px; height: 18px; display: flex; justify-content: flex-end; align-items: center; gap: 6px; z-index: 3; }
+  .lockhead { position: absolute; top: 46px; left: 0; right: 0; text-align: center; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25); }
+  .lockhead svg { display: block; margin: 0 auto 6px; opacity: 0.9; }
+  .lockhead .date { font-size: 17px; font-weight: 600; }
+  .lockhead .clock { font-size: 88px; font-weight: 300; line-height: 1; letter-spacing: -0.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .guide { position: absolute; left: 0; right: 0; top: 25%; z-index: 4; border-top: 2px dashed rgba(255, 255, 255, 0.9); pointer-events: none; display: none; }
+  .guide span { position: absolute; right: 14px; top: -26px; background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  html.guide .guide { display: block; }
+  .notif {
+    position: absolute; top: 25%; left: 12px; right: 12px;
+    border-radius: 24px; overflow: hidden;
+    background: rgba(255, 255, 255, 0.8);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: blur(24px) saturate(1.6);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  }
+  .notif iframe { display: block; width: 100%; height: 300px; border: 0; background: transparent; }
+  .homebar { position: absolute; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: rgba(255, 255, 255, 0.75); z-index: 3; }
+
+  .wp0 { background: radial-gradient(120% 80% at 15% 8%, #ffb36b 0%, transparent 55%), radial-gradient(100% 70% at 95% 45%, #ff4f8b 0%, transparent 60%), linear-gradient(160deg, #5b2a86 0%, #1d1747 100%); }
+  .wp1 { background: radial-gradient(90% 60% at 80% 12%, #6ee7f9 0%, transparent 60%), radial-gradient(100% 70% at 10% 70%, #2563eb 0%, transparent 65%), linear-gradient(180deg, #0b3a5b, #06162b); }
+  .wp2 { background: radial-gradient(90% 60% at 30% 15%, #9be15d 0%, transparent 55%), radial-gradient(90% 70% at 85% 75%, #00a389 0%, transparent 60%), linear-gradient(170deg, #12452f, #071a14); }
+  .wp3 { background: radial-gradient(80% 60% at 70% 15%, #c084fc 0%, transparent 60%), radial-gradient(90% 60% at 20% 80%, #f472b6 0%, transparent 60%), linear-gradient(180deg, #312e81, #0f0c29); }
+  .wp4 { background: radial-gradient(90% 60% at 25% 10%, #ffe0b2 0%, transparent 60%), radial-gradient(90% 70% at 80% 70%, #f59e0b 0%, transparent 65%), linear-gradient(170deg, #b45309, #3b1d0b); }
+  .wp5 { background: radial-gradient(70% 50% at 50% 25%, rgba(255, 90, 31, 0.6) 0%, transparent 60%), linear-gradient(180deg, #2a2a2e, #0b0b0d); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="screen" id="screen">
+    <div class="cam"></div>
+    <div class="status">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="#fff" aria-hidden="true"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="15" height="11" viewBox="0 0 15 11" fill="#fff" aria-hidden="true"><path d="M7.5 2.2c2.2 0 4.2.9 5.7 2.3l1.3-1.3A9.9 9.9 0 0 0 7.5.4 9.9 9.9 0 0 0 .5 3.2l1.3 1.3a8.1 8.1 0 0 1 5.7-2.3Zm0 3.4c1.3 0 2.4.5 3.3 1.3l1.3-1.3a6.5 6.5 0 0 0-9.2 0l1.3 1.3c.9-.8 2-1.3 3.3-1.3Zm0 3.4c-.5 0-.9.2-1.3.5L7.5 11l1.3-1.5c-.4-.3-.8-.5-1.3-.5Z"/></svg>
+      <svg width="26" height="12" viewBox="0 0 26 12" aria-hidden="true"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="#fff" opacity=".6"/><rect x="2" y="2" width="16" height="8" rx="1.6" fill="#fff"/><rect x="23.5" y="4" width="2" height="4" rx="1" fill="#fff" opacity=".6"/></svg>
+    </div>
+    <div class="lockhead">
+      <svg width="14" height="18" viewBox="0 0 14 18" fill="#fff" aria-hidden="true"><path d="M3 7V5a4 4 0 0 1 8 0v2h.5A2.5 2.5 0 0 1 14 9.5v6a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 0 15.5v-6A2.5 2.5 0 0 1 2.5 7H3Zm1.8 0h4.4V5a2.2 2.2 0 0 0-4.4 0v2Z"/></svg>
+      <div class="date" id="date"></div>
+      <div class="clock" id="clock"></div>
+    </div>
+    <div class="guide"><span>75% of screen ↓</span></div>
+    <div class="notif"><iframe id="widget" scrolling="no" title="Poll"></iframe></div>
+    <div class="homebar"></div>
+  </div>
+</div>
+<script>
+(function () {
+  const P = new URLSearchParams(location.search);
+  const pollId = P.get('poll') || '';
+  const locale = P.get('locale') === 'de' ? 'de' : 'en';
+  const state = P.get('state') === 'results' ? 'results' : 'vote';
+  const src = P.get('src') === 'snapshot' ? '1' : 'admin';
+  const isTop = window.top === window;
+  if (isTop) document.documentElement.classList.add('top');
+  if (P.get('guide') === '1') document.documentElement.classList.add('guide');
+  document.documentElement.lang = locale;
+
+  // Same poll → same wallpaper every time.
+  let h = 0;
+  for (const c of pollId) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  document.getElementById('screen').classList.add('wp' + (h % 6));
+
+  function tick() {
+    const tag = locale === 'de' ? 'de-DE' : 'en-GB';
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit', hour12: false });
+    document.getElementById('date').textContent = new Date().toLocaleDateString(tag, { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+  tick();
+  setInterval(tick, 30000);
+
+  // Scale the phone to fit the space it's given (never larger than real size).
+  const pad = P.has('pad') ? Number(P.get('pad')) : (isTop ? 24 : 8);
+  function fit() {
+    const s = Math.min((innerWidth - 2 * pad) / 414, (innerHeight - 2 * pad) / 868, 1);
+    document.documentElement.style.setProperty('--s', Math.max(s, 0.1));
+  }
+  fit();
+  addEventListener('resize', fit);
+
+  const widget = document.getElementById('widget');
+  const q = new URLSearchParams({ poll: pollId, locale, theme: 'glass', preview: src });
+  if (state === 'results') q.set('voted', 'top');
+  if (P.get('v')) q.set('v', P.get('v'));
+  widget.src = '/static/widget-compact.html?' + q;
+
+  addEventListener('message', (e) => {
+    if (e.source === widget.contentWindow && e.data && e.data.type === 'opinary-height') {
+      widget.style.height = e.data.height + 'px';
+    }
+  });
+})();
+</script>
+</body>
+</html>

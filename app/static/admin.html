@@ -185,6 +185,14 @@
   .preview-scale iframe {
     width: 500px; height: 600px; border: none; background: #fff;
   }
+  /* Phone view: compact widget on a phone lock screen (lockscreen-phone.html) */
+  body.view-phone .card-preview,
+  body.view-phone .sk-preview { height: 440px; }
+  .phone-thumb { position: absolute; inset: 0; pointer-events: none; }
+  .phone-thumb iframe { width: 100%; height: 100%; border: none; background: transparent; display: block; }
+  .ipv-frame-wrap.phone { padding: 0; align-items: stretch; }
+  .ipv-actions .locale-tabs button, .ipv-actions .btn-ghost { white-space: nowrap; }
+  .ipv-phone { flex: 1; width: 100%; border: none; background: transparent; display: block; }
   .preview-overlay {
     position: absolute; inset: 0;
     background: linear-gradient(180deg, rgba(244,241,235,0) 40%, rgba(244,241,235,0.92) 92%);
@@ -556,7 +564,37 @@ const STATE = {
   drawer: null,
   drawerPollId: null,
   locale: localStorage.getItem('admin_locale') || 'en',
+  // 'phone' = compact widget on a phone lock screen; 'article' = today's article widget.
+  view: localStorage.getItem('admin_preview_view') === 'article' ? 'article' : 'phone',
 };
+// One value per admin page load: previews always fetch the newest phone/widget
+// files, but the many previews on one page share a single download.
+const ASSET_V = String(Date.now());
+
+function setView(v) {
+  STATE.view = v;
+  localStorage.setItem('admin_preview_view', v);
+  showList();
+}
+
+function viewToggleHTML() {
+  const opts = [['phone', 'Phone'], ['article', 'Article']];
+  return `
+    <div class="locale-tabs" role="tablist" aria-label="Preview style">
+      ${opts.map(([v, label]) => `
+        <button class="${STATE.view === v ? 'active' : ''}" onclick="setView('${v}')" title="${v === 'phone'
+          ? 'Compact widget on a phone lock screen (proposal)'
+          : 'Today’s widget as embedded in articles'}">${label}</button>
+      `).join('')}
+    </div>
+  `;
+}
+
+// Lock-screen phone preview of one poll. Read-only: votes are simulated on screen.
+function phoneUrl(pollId, state, extra = {}) {
+  const q = new URLSearchParams({ poll: pollId, locale: STATE.locale, state, v: ASSET_V, ...extra });
+  return `/static/lockscreen-phone.html?${q}`;
+}
 
 function setLocale(loc) {
   STATE.locale = loc;
@@ -669,6 +707,7 @@ function logout() {
 /* ===== Polls list view ===== */
 async function showList() {
   showApp();
+  document.body.classList.toggle('view-phone', STATE.view === 'phone');
   $('app-main').innerHTML = `
     <div class="topbar">
       <div>
@@ -676,6 +715,7 @@ async function showList() {
         <div class="page-sub">Live commerce polls embedded across your articles.</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
+        ${viewToggleHTML()}
         ${localeToggleHTML()}
         <button class="btn-primary" onclick="showEditor(null)">+ New poll</button>
       </div>
@@ -717,11 +757,14 @@ function renderCard(p) {
   const hasBridge = (p.rec_count || 0) > 0;
   const bridgePill = hasBridge ? `<span class="pill pill-gen">✦ BRIDGE READY</span>` : '';
 
-  // Live iframe thumbnail of the real widget. scale(0.58) fits 500px → ~290px.
   // Only render for active polls; archived polls get a muted placeholder.
-  const preview = isActive
-    ? `<div class="preview-scale"><iframe src="/widget/${esc(p.id)}${localeQS()}" scrolling="no" loading="lazy" aria-hidden="true" tabindex="-1"></iframe></div>`
-    : `<div style="padding: 40px 20px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.6;">Preview disabled<br>while archived</div>`;
+  // Phone view: the compact widget after voting, on a phone lock screen.
+  // Article view: live iframe of today's widget, scale(0.58) fits 500px → ~290px.
+  const preview = !isActive
+    ? `<div style="padding: 40px 20px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.6;">Preview disabled<br>while archived</div>`
+    : STATE.view === 'phone'
+    ? `<div class="phone-thumb"><iframe src="${esc(phoneUrl(p.id, 'results', { pad: 14 }))}" scrolling="no" loading="lazy" aria-hidden="true" tabindex="-1" title="Phone preview"></iframe></div>`
+    : `<div class="preview-scale"><iframe src="/widget/${esc(p.id)}${localeQS()}" scrolling="no" loading="lazy" aria-hidden="true" tabindex="-1"></iframe></div>`;
 
   return `
     <div class="poll-card" data-id="${esc(p.id)}">
@@ -755,6 +798,7 @@ let previewEscHandler = null;
 function openPreview(pollId) {
   const poll = STATE.polls.find(p => p.id === pollId);
   if (!poll) return;
+  if (STATE.view === 'phone') return openPhonePreview(poll);
   const host = $('modal-host');
   host.innerHTML = `
     <div class="modal-root">
@@ -784,6 +828,49 @@ function openPreview(pollId) {
   previewEscHandler = (e) => { if (e.key === 'Escape') closePreview(); };
   window.addEventListener('keydown', previewEscHandler);
 }
+// Phone view of the interactive preview: the compact widget on a full-size phone
+// lock screen. Votes are simulated on screen only — nothing is counted.
+let phonePreviewState = 'vote';
+function openPhonePreview(poll) {
+  phonePreviewState = 'vote';
+  $('modal-host').innerHTML = `
+    <div class="modal-root">
+      <div class="modal-backdrop" onclick="closePreview()"></div>
+      <div class="ipv-shell" role="dialog" aria-modal="true">
+        <div class="ipv-head">
+          <div>
+            <div class="ipv-eyebrow">Phone preview · lock screen</div>
+            <div class="ipv-title">${esc(localizedQuestion(poll))}</div>
+          </div>
+          <div class="ipv-actions">
+            <div class="locale-tabs" id="phone-state-tabs" role="tablist" aria-label="Start screen">
+              <button class="active" data-state="vote" onclick="setPhonePreviewState('${esc(poll.id)}', 'vote')">Before voting</button>
+              <button data-state="results" onclick="setPhonePreviewState('${esc(poll.id)}', 'results')">After voting</button>
+            </div>
+            <button class="btn-ghost" onclick="window.open(phoneUrl('${esc(poll.id)}', phonePreviewState), '_blank')">Open in new tab ↗</button>
+            <button class="btn-close" onclick="closePreview()" aria-label="Close">✕</button>
+          </div>
+        </div>
+        <div class="ipv-frame-wrap phone">
+          <iframe class="ipv-phone" id="phone-frame" src="${esc(phoneUrl(poll.id, 'vote', { pad: 20 }))}" title="Phone preview"></iframe>
+        </div>
+        <div class="ipv-foot">
+          <span>Tap an answer to vote, then tap another to change it. Votes in this preview are simulated and not counted.</span>
+          <span>Press <span class="kbd">Esc</span> to close</span>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.style.overflow = 'hidden';
+  previewEscHandler = (e) => { if (e.key === 'Escape') closePreview(); };
+  window.addEventListener('keydown', previewEscHandler);
+}
+function setPhonePreviewState(pollId, state) {
+  phonePreviewState = state;
+  document.querySelectorAll('#phone-state-tabs button').forEach(b => b.classList.toggle('active', b.dataset.state === state));
+  $('phone-frame').src = phoneUrl(pollId, state, { pad: 20 });
+}
+
 function closePreview() {
   $('modal-host').innerHTML = '';
   document.body.style.overflow = '';

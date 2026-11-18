@@ -83,6 +83,62 @@ def _render_products(products: list, locale: str) -> list:
     ]
 
 
+async def build_preview(poll: dict, locales=("en", "de")) -> dict:
+    """What a reader would see after voting, for EVERY option — without recording a vote.
+
+    Same data the vote endpoint returns (results, bridge, rendered products), but
+    read-only. Used by the admin phone preview (/admin/api/polls/{id}/preview) and
+    by scripts/build_lockscreen_snapshot.py. Options with no cached recs in a
+    locale are simply missing from `by_option`: a real vote would generate them,
+    a preview never calls Claude.
+    """
+    results = await poll_service.get_results(poll["id"])
+    option_ids = [o["id"] for o in poll["options"]]
+
+    per_locale = {}
+    for locale in locales:
+        rows = await poll_service.get_cached_recs_bulk(option_ids, locale)
+        # Same label override the vote endpoint applies for the reader's locale.
+        overrides = {
+            o["id"]: (o.get("translations") or {}).get(locale, {}).get("label")
+            for o in poll["options"]
+        }
+        per_locale[locale] = {
+            "results": [
+                {**r, "label": overrides.get(r["option_id"]) or r["label"]}
+                for r in results["results"]
+            ],
+            "total": results["total"],
+            "by_option": {
+                oid: {
+                    "bridge": row["bridge"],
+                    "recommendations": _render_products(row["products"], locale),
+                }
+                for oid, row in rows.items()
+            },
+        }
+
+    # Previews open on the most popular answer (ties: first in poll order).
+    most_voted = (
+        max(results["results"], key=lambda r: r["count"])["option_id"] if results["results"] else None
+    )
+
+    return {
+        "poll": {
+            "id": poll["id"],
+            "question": poll["question"],
+            "translations": poll.get("translations") or {},
+            "publisher_name": poll.get("publisher_name"),
+            "options": [
+                {"id": o["id"], "label": o["label"], "translations": o.get("translations") or {}}
+                for o in poll["options"]
+            ],
+        },
+        "default_option_id": most_voted,
+        "locales": per_locale,
+    }
+
+
 @router.get("/widget/{poll_id}", response_class=HTMLResponse)
 async def widget(poll_id: str):
     poll = await poll_service.get_poll(poll_id)

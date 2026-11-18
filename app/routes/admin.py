@@ -15,6 +15,7 @@ from app.models import (
     PollUpdateRequest,
     RegenerateRecsRequest,
 )
+from app.routes.public import build_preview
 from app.services import claude_service, mockup_service, poll_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -110,6 +111,20 @@ async def api_list_recommendations(poll_id: str, admin_token: Optional[str] = Co
         raise HTTPException(status_code=404, detail="Poll not found")
     recs = await poll_service.list_recs_for_poll(poll_id)
     return {"options": poll["options"], "recommendations": recs}
+
+
+@router.get("/api/polls/{poll_id}/preview")
+async def api_preview(poll_id: str, locale: str = "en", admin_token: Optional[str] = Cookie(None)):
+    """Read-only data for the admin's phone preview: results, bridges and products
+    for every option, as a reader would see them after voting. Records no vote and
+    never calls Claude."""
+    _check_auth(admin_token)
+    if locale not in ("en", "de"):
+        raise HTTPException(status_code=400, detail="locale must be 'en' or 'de'")
+    poll = await poll_service.get_poll(poll_id)
+    if not poll:
+        raise HTTPException(status_code=404, detail="Poll not found")
+    return await build_preview(poll, (locale,))
 
 
 @router.post("/api/options/{option_id}/regenerate-recs")

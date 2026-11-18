@@ -68,6 +68,9 @@ admin ---(cookie auth)---> /admin/* (poll CRUD, rec preview/regen/bridge edit)
 - `app/static/embed.js` — one-line publisher snippet. Reads `data-poll-id`, injects iframe, listens for height messages.
 - `app/static/admin.html` — admin SPA. Sections: login, polls list, poll editor, recs panel.
 - `app/static/demo.html` — dev-only test page that embeds a widget at `/demo.html`. Stores the poll ID in localStorage.
+- `app/static/widget-compact.html` — **proposal, not embedded by publishers yet.** Mobile/lock-screen variant: before voting it looks like today's widget; after voting the answers collapse (tap another to change your vote — on screen only, the server keeps the first vote) and products show image, name, one Amazon price, one buy link. `?preview=1|admin` = read-only mode, votes simulated, never POSTed.
+- `app/static/lockscreen-phone.html` — one poll's compact widget on a generic phone lock screen, scaled to fit. The admin's **Phone** view (default; **Article** = today's widget) uses it for card thumbnails, the preview window and "Open in new tab". Data comes from `GET /admin/api/polls/{id}/preview?locale=` (admin cookie; read-only, never calls Claude), built by `build_preview()` in `public.py`.
+- `app/static/lockscreen-showcase.html` — all active polls on phone lock screens + an in-browser fit check (everything must fit in 75% of the screen). Reads a static snapshot in `app/static/lockscreen-data/`; refresh with `venv/bin/python scripts/build_lockscreen_snapshot.py` (read-only).
 - `scripts/setup_db.py` — schema + migration runner (direct psycopg2).
 
 ### Data model

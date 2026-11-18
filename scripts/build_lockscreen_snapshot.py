@@ -31,7 +31,7 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(ROOT / ".env")
 
-from app.routes.public import _render_products  # noqa: E402
+from app.routes.public import build_preview  # noqa: E402
 from app.services import poll_service  # noqa: E402
 
 OUT_DIR = ROOT / "app" / "static" / "lockscreen-data"
@@ -39,51 +39,8 @@ LOCALES = ("en", "de")
 
 
 async def build_poll(poll: dict) -> dict:
-    results = await poll_service.get_results(poll["id"])
-    option_ids = [o["id"] for o in poll["options"]]
-
-    per_locale = {}
-    for locale in LOCALES:
-        rows = await poll_service.get_cached_recs_bulk(option_ids, locale)
-        # Same label override the vote endpoint applies for the reader's locale.
-        overrides = {
-            o["id"]: (o.get("translations") or {}).get(locale, {}).get("label")
-            for o in poll["options"]
-        }
-        per_locale[locale] = {
-            "results": [
-                {**r, "label": overrides.get(r["option_id"]) or r["label"]}
-                for r in results["results"]
-            ],
-            "total": results["total"],
-            "by_option": {
-                oid: {
-                    "bridge": row["bridge"],
-                    # Full product fields (same as the vote endpoint), so the showcase can
-                    # also render today's widget side by side with the compact one.
-                    "recommendations": _render_products(row["products"], locale),
-                }
-                for oid, row in rows.items()
-            },
-        }
-
-    # Showcase opens on the most popular answer (ties: first in poll order).
-    most_voted = max(results["results"], key=lambda r: r["count"])["option_id"] if results["results"] else None
-
-    return {
-        "poll": {
-            "id": poll["id"],
-            "question": poll["question"],
-            "translations": poll.get("translations") or {},
-            "publisher_name": poll.get("publisher_name"),
-            "options": [
-                {"id": o["id"], "label": o["label"], "translations": o.get("translations") or {}}
-                for o in poll["options"]
-            ],
-        },
-        "default_option_id": most_voted,
-        "locales": per_locale,
-    }
+    # Same read-only builder the admin phone preview uses (app/routes/public.py).
+    return await build_preview(poll, LOCALES)
 
 
 async def main() -> None:
