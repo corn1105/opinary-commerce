@@ -560,8 +560,10 @@
             </div>
           `).join('')}
         </div>` : '';
+      // If the image fails to load (dead URL, CDN hiccup), fall back to the same
+      // bag icon used when there's no image — never show a broken-image box.
       const imgBlock = p.image_url
-        ? `<div class="img"><img src="${esc(p.image_url)}" alt=""></div>`
+        ? `<div class="img"><img src="${esc(p.image_url)}" alt="" onerror="this.parentNode.textContent='🛍'"></div>`
         : `<div class="img">🛍</div>`;
       return `
         <div class="rec">

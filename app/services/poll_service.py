@@ -216,22 +216,12 @@ async def get_cached_recs_bulk(option_ids: list, locale: str) -> dict:
     return {r["option_id"]: r for r in rows}
 
 
-def _placeholder_image(name: str) -> str:
-    """Generic category photo via loremflickr; deterministic per product title."""
-    import hashlib
-    from urllib.parse import quote
-    keywords = ",".join([w for w in name.lower().split() if len(w) > 3][:2]) or "product"
-    seed = hashlib.md5(name.encode()).hexdigest()[:8]
-    return f"https://loremflickr.com/400/300/{quote(keywords)}?lock={seed}"
-
-
 async def upsert_recs(option_id: str, locale: str, bridge: str, products: list[dict]) -> dict:
     from datetime import datetime, timezone
-    # Ensure every product has an image_url (placeholder if none provided).
-    products = [
-        {**p, "image_url": p.get("image_url") or _placeholder_image(p["title"])}
-        for p in products
-    ]
+    # No placeholder image: products without a real image_url render the widget's
+    # bag icon, and the image backfill scripts pick up any product whose
+    # image_url isn't an Amazon CDN URL. (We used to insert loremflickr stock
+    # photos here; that service went down and left broken images in the widget.)
     row = {
         "option_id": option_id,
         "locale": locale,

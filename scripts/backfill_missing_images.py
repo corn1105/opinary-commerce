@@ -120,6 +120,12 @@ def main() -> None:
             img = image_from_dp(asin, tld, lang)
         if not img and query:
             img = image_from_search(query, tld, lang)
+        if not img and query and tld == "co.uk":
+            # amazon.co.uk often returns an empty page to scripted requests.
+            # UK products carry English titles and the CDN image is the same on
+            # every marketplace, so amazon.com is a safe fallback. (Not used for
+            # `de`: German titles search poorly on .com and can match the wrong item.)
+            img = image_from_search(query, "com", "en-US,en;q=0.9")
         cache[title] = img
         print(f"=> {img[:55] + '…' if img and len(img) > 55 else img or 'STILL NOT FOUND'}")
         time.sleep(1.5)
