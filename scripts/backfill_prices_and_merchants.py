@@ -1,55 +1,72 @@
 """Backfill `price`, `alt_price`, and trim descriptions on every cached product.
 
-- `price`: primary (Amazon) price. Filled from hardcoded category × badge tier if
-  the product doesn't already have one (seeded flagship products keep theirs).
-- `alt_price`: simulated secondary (Best Buy) price = round(price * 1.08) to a
-  tidy $-ending value. Always computed from price so the two merchants show a
-  consistent-looking comparison.
+- `price`: primary (Amazon) price.
+  1. If the product title matches a row in scripts/product_prices.py (hand-
+     checked typical retail), that price is ALWAYS applied for `en` (USD) and
+     `de` (EUR), even over an existing price. Re-running re-applies them.
+  2. Otherwise, only if the product has no price yet: a category × badge tier
+     estimate (the old behaviour). The script prints these titles so someone
+     can add a real row to product_prices.py.
+- `alt_price`: simulated secondary-shop price (Best Buy for en, Otto for de) =
+  price × 1.08 at a tidy ending. Recomputed whenever the price comes from
+  product_prices.py; cleared for subscriptions and books (NO_ALT_PRICE).
 - description: clamped to 110 chars at a word boundary. CSS also line-clamps at
   3 lines as a safety net.
 
-Usage:  venv/bin/python scripts/backfill_prices_and_merchants.py
-Idempotent: re-running leaves already-stamped products untouched.
+Prices are display strings shown verbatim by the widget, formatted for the
+reader: English "$1,299", German "1.299 €" (no-break space before €).
+
+Usage:  venv/bin/python scripts/backfill_prices_and_merchants.py [--dry-run]
+Only rows that actually change are written.
 """
 
+import argparse
+import copy
 import hashlib
-import random
 import re
 import sys
 from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
 
 from app.services.poll_service import get_db  # noqa: E402
+from product_prices import NO_ALT_PRICE, PRODUCT_PRICES  # noqa: E402
 
+_CURATED = [(re.compile(rx, re.IGNORECASE), usd, eur) for rx, usd, eur in PRODUCT_PRICES]
+_NO_ALT = [re.compile(rx, re.IGNORECASE) for rx in NO_ALT_PRICE]
 
-# (low_tier, mid_tier, premium_tier) in local currency units (numbers stay the
-# same across USD/EUR/GBP — for demo realism the rough magnitude is right and
-# nobody cross-checks an Away carry-on at 395 dollars vs 395 euros).
+# Fallback only (products with no row in product_prices.py).
+# (low_tier, mid_tier, premium_tier) in local currency units; the same numbers
+# are used for USD and EUR, which is close enough for an estimate.
 # low = BEST VALUE, mid = MOST POPULAR/NEW RELEASE, premium = TOP RATED/EDITOR'S PICK
 PRICE_RANGES = {
     "running,shoes,sneakers":      (95, 140, 180),
-    "mattress,bed,bedroom":        (795, 1395, 2295),
-    "headphones,audio,music":      (149, 299, 399),
-    "espresso,coffee,machine":     (499, 899, 1499),
-    "suitcase,luggage,travel":     (199, 395, 725),
-    "office,chair,desk":           (399, 899, 1795),
-    "doorbell,camera,security":    (149, 229, 349),
-    "knife,chef,kitchen":          (49, 129, 195),
-    "vacuum,cleaner,floor":        (399, 699, 1099),
-    "thermostat,wall,smart":       (149, 249, 329),
-    "television,tv,livingroom":    (699, 1499, 2499),
-    "smartwatch,running,watch":    (229, 399, 699),
-    "grill,bbq,barbecue":          (349, 799, 1499),
-    "sunglasses,summer,beach":     (29, 95, 199),
+    "mattress,bed,bedroom":        (499, 1099, 1999),
+    "headphones,audio,music":      (99, 249, 379),
+    "espresso,coffee,machine":     (149, 499, 999),
+    "suitcase,luggage,travel":     (149, 299, 549),
+    "office,chair,desk":           (299, 599, 1399),
+    "doorbell,camera,security":    (69, 149, 229),
+    "knife,chef,kitchen":          (29, 99, 169),
+    "vacuum,cleaner,floor":        (299, 549, 999),
+    "thermostat,wall,smart":       (79, 179, 249),
+    "television,tv,livingroom":    (449, 999, 1999),
+    "smartwatch,running,watch":    (199, 349, 549),
+    "grill,bbq,barbecue":          (249, 599, 1199),
+    "sunglasses,summer,beach":     (29, 95, 179),
     "kindle,ebook,reader":         (99, 159, 279),
-    "air,purifier,bedroom":        (199, 329, 699),
-    "sunscreen,skincare,beach":    (21, 38, 58),
-    "skincare,face,serum":         (18, 32, 65),
-    "bicycle,bike,cycling":        (799, 1799, 3499),
-    "dog,cat,pet":                 (49, 129, 249),
-    "dumbbells,fitness,gym":       (199, 499, 1199),
+    "air,purifier,bedroom":        (99, 199, 549),
+    "sunscreen,skincare,beach":    (12, 25, 39),
+    "skincare,face,serum":         (12, 25, 45),
+    "bicycle,bike,cycling":        (499, 1099, 2299),
+    "dog,cat,pet":                 (25, 59, 99),
+    "dumbbells,fitness,gym":       (39, 199, 449),
+    # Sleep gadgets (masks, pillows, trackers, sunrise clocks) — NOT mattresses.
+    "sleep,gadgets":               (35, 149, 299),
+    # Small home-workout kit (bands, kettlebells, books, suspension trainers).
+    "fitness,accessories":         (15, 39, 129),
 }
 
 # PRIMARY mapping: poll id -> category. Keyed by id (stable) so re-wording a
@@ -67,7 +84,7 @@ POLL_ID_TO_CATEGORY = {
     "9cce8d26-54c4-432d-be0b-2eb20d8cd009": "espresso,coffee,machine",    # Home coffee or café coffee?
     "e113e145-210c-44f3-83f4-736010665fac": "television,tv,livingroom",   # How big is your living-room TV?
     "fc761120-5102-4a7c-8f0e-168a2eb6b490": "sunglasses,summer,beach",    # How did you lose or break your last pair of sunglasses?
-    "33021a8d-ff34-4482-832e-a3051b32361e": "mattress,bed,bedroom",       # How many hours sleep do you need?
+    "33021a8d-ff34-4482-832e-a3051b32361e": "sleep,gadgets",              # How many hours sleep do you need?
     "251d0db1-0bc9-4fb8-9525-c9b72b9dd876": "running,shoes,sneakers",     # How many miles do you run a week?
     "eb8bbc4f-6965-4f3a-8a93-519aa26145f0": "kindle,ebook,reader",        # How many unread books are on your nightstand?
     "ac540b1f-fc81-4822-941e-306da8fde58e": "vacuum,cleaner,floor",       # How often do you vacuum?
@@ -77,7 +94,7 @@ POLL_ID_TO_CATEGORY = {
     "ab8df30f-478a-45a5-b77e-683dc06748bd": "office,chair,desk",          # How's your back at the end of a workday?
     "dc314590-acf0-43b3-b898-c68beb809bdc": "running,shoes,sneakers",     # Welche nachhaltige Schuhmarke passt am besten zu dir?
     "e5479266-cd80-4c2c-a8ee-1f0b3a4351d6": "dog,cat,pet",                # What does your dog or cat eat?
-    "369c3184-1dbb-4ceb-a142-5f62e195afd9": "dumbbells,fitness,gym",      # What does your workout routine look like right now?
+    "369c3184-1dbb-4ceb-a142-5f62e195afd9": "fitness,accessories",        # What does your workout routine look like right now?
     "5e748f6a-40d2-45f8-85a5-ac60e2b1111f": "skincare,face,serum",        # What's your biggest skin concern?
     "7f82fb3b-bc3a-4fc7-a5dd-975119a39b37": "bicycle,bike,cycling",       # When did you last replace your main bike?
     "bf393ca1-4163-46e2-a4a0-3e1e88f6476e": "headphones,audio,music",     # When did you last upgrade your headphones?
@@ -91,6 +108,7 @@ POLL_TO_CATEGORY = [
     ("miles do you run",                            "running,shoes,sneakers"),
     ("kilometres do you",                           "running,shoes,sneakers"),  # safety net for any unpolished/legacy data
     ("How old is your mattress",                    "mattress,bed,bedroom"),
+    ("hours sleep",                                 "sleep,gadgets"),
     ("upgrade your headphones",                     "headphones,audio,music"),
     ("Home coffee or café coffee",                  "espresso,coffee,machine"),
     ("Carry-on only",                               "suitcase,luggage,travel"),
@@ -109,14 +127,14 @@ POLL_TO_CATEGORY = [
     ("Which SPF do you reach for",                  "sunscreen,skincare,beach"),
     ("last replace your main bike",                 "bicycle,bike,cycling"),
     ("dog or cat",                                  "dog,cat,pet"),
+    ("workout routine",                             "fitness,accessories"),
     ("Gym or home",                                 "dumbbells,fitness,gym"),
     ("biggest skin concern",                        "skincare,face,serum"),
 ]
 
-# Currency by stored locale string. Drives the symbol shown on the merchant
-# block and the comparison row. The *which retailer* decision (Best Buy for en,
-# a German retailer for de) is made at render time in public.py — this script
-# only produces the comparison price.
+# Currency by stored locale string. Only `en` and `de` are ever served to
+# readers (see locale_service.py); the other rows are legacy and untouched by
+# product_prices.py.
 LOCALE_CURRENCY = {
     "en":    "$",
     "en-US": "$",
@@ -125,8 +143,12 @@ LOCALE_CURRENCY = {
     "de":    "€",
     "de-DE": "€",
 }
-# Locales that get a secondary-merchant comparison price. Includes de now that
-# the widget shows a German retailer there instead of Best Buy.
+# German number style ("1.299 €") for these locales.
+GERMAN_FORMAT_LOCALES = {"de", "de-DE"}
+# Which column of PRODUCT_PRICES applies to which served locale.
+CURATED_COLUMN = {"en": 1, "de": 2}
+# Locales that get a secondary-merchant comparison price (retailer chosen per
+# locale at render time in public.py: Best Buy for en, Otto for de).
 ALT_PRICE_LOCALES = {"en", "en-US", "de", "de-DE"}
 
 BADGE_TIER = {
@@ -151,6 +173,33 @@ def category_for(poll: dict) -> Optional[str]:
     return None
 
 
+def format_price(n: int, locale: str) -> str:
+    """$1,299 for English readers, 1.299 € for German readers."""
+    if locale in GERMAN_FORMAT_LOCALES:
+        return f"{n:,}".replace(",", ".") + " €"
+    return f"{LOCALE_CURRENCY.get(locale, '$')}{n:,}"
+
+
+def curated_price(title: str, locale: str) -> Optional[str]:
+    """Hand-checked price from product_prices.py, formatted for `locale`."""
+    col = CURATED_COLUMN.get(locale)
+    if col is None:
+        return None
+    for row in _CURATED:
+        if row[0].search(title or ""):
+            value = row[col]
+            if value is None:
+                return None
+            return value if isinstance(value, str) else format_price(value, locale)
+    return None
+
+
+def wants_alt_price(title: str, price: Optional[str]) -> bool:
+    if not price or "/" in price:  # subscriptions ("$14.95/mo") never get one
+        return False
+    return not any(rx.search(title or "") for rx in _NO_ALT)
+
+
 def _pretty_round(n: float) -> int:
     """Round to a plausible shelf price ending (e.g. $29, $149, $1,295)."""
     if n < 50:
@@ -164,35 +213,43 @@ def _pretty_round(n: float) -> int:
     return round(n / 50) * 50 - 5
 
 
-def estimate_price(title: str, badge: str, category: str, currency: str) -> str:
+def estimate_price(title: str, badge: str, category: str, locale: str) -> str:
     low, mid, high = PRICE_RANGES[category]
     tier = BADGE_TIER.get(badge, 1)
     base = [low, mid, high][tier]
     # deterministic jitter ±12% based on product title
     h = int(hashlib.md5(title.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
     jittered = base * (0.88 + 0.24 * h)
-    return f"{currency}{_pretty_round(jittered):,}"
+    return format_price(_pretty_round(jittered), locale)
 
 
 def parse_money(s: str) -> Optional[float]:
-    m = re.search(r"([\d,]+(?:\.\d+)?)", s or "")
+    """Read "$1,299", "€1,299" (old German style), "1.299 €" or "9,95 €"."""
+    s = (s or "").strip()
+    m = re.search(r"\d[\d.,]*", s)
     if not m:
         return None
-    return float(m.group(1).replace(",", ""))
+    num = m.group(0)
+    if s.endswith("€") or "€/" in s:  # German: "." groups thousands, "," is decimal
+        num = num.replace(".", "").replace(",", ".")
+    else:
+        num = num.replace(",", "")
+    return float(num)
 
 
-def derive_alt_price(primary: str, currency: str) -> Optional[str]:
+def derive_alt_price(primary: str, locale: str) -> Optional[str]:
     n = parse_money(primary)
     if n is None:
         return None
-    # Best Buy comparison: slightly higher, ~8% up, to make "LOWEST" meaningful on Amazon
-    alt = _pretty_round(n * 1.08)
-    return f"{currency}{alt:,}"
+    # Comparison shop: ~8% higher, so the Amazon price reads as the lowest.
+    return format_price(_pretty_round(n * 1.08), locale)
 
 
 def trim_desc(s: str, max_chars: int = 110) -> str:
     s = (s or "").strip()
-    if len(s) <= max_chars:
+    # Already short enough — or already trimmed by an earlier run (110 chars +
+    # "…"). Without the second check every re-run chopped off another word.
+    if len(s) <= max_chars or (s.endswith("…") and len(s) <= max_chars + 1):
         return s
     cut = s[: max_chars + 1]
     idx = cut.rfind(" ")
@@ -201,37 +258,75 @@ def trim_desc(s: str, max_chars: int = 110) -> str:
     return cut[:idx].rstrip(" ,.;:") + "…"
 
 
+def apply_prices(products: list, locale: str, category: Optional[str], unmatched: set) -> list:
+    """Return a new product list with prices/alt prices/descriptions fixed."""
+    out = copy.deepcopy(products)
+    show_alt = locale in ALT_PRICE_LOCALES
+    for p in out:
+        title = p.get("title", "")
+        curated = curated_price(title, locale)
+        if curated:
+            p["price"] = curated
+        elif not p.get("price") and category:
+            p["price"] = estimate_price(title, p.get("badge", "MOST POPULAR"), category, locale)
+        if locale in CURATED_COLUMN and not curated:
+            unmatched.add((locale, title))
+
+        if show_alt and wants_alt_price(title, p.get("price")):
+            if curated or not p.get("alt_price"):
+                p["alt_price"] = derive_alt_price(p["price"], locale)
+        elif locale in CURATED_COLUMN and (curated or not wants_alt_price(title, p.get("price"))):
+            p["alt_price"] = None
+
+        p["description"] = trim_desc(p.get("description", ""))
+    return out
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--dry-run", action="store_true", help="print what would change; write nothing")
+    args = parser.parse_args()
+
     db = get_db()
     polls = {p["id"]: p for p in (db.table("polls").select("*").execute().data or [])}
     options = db.table("poll_options").select("id, poll_id").execute().data or []
     opt_to_poll = {o["id"]: o["poll_id"] for o in options}
     recs = db.table("recommendations").select("*").execute().data or []
 
-    updated = 0
-    no_category = 0
+    changed_rows = 0
+    changed_products = 0
+    no_category = set()
+    unmatched: set = set()
     print(f"Processing {len(recs)} recommendation rows...")
     for rec in recs:
         poll = polls.get(opt_to_poll.get(rec["option_id"]))
         category = category_for(poll) if poll else None
         if poll and category is None:
-            no_category += 1
-            print(f"  ⚠ no category for poll: {poll['question']!r}")
-        currency = LOCALE_CURRENCY.get(rec["locale"], "$")
-        show_alt = rec["locale"] in ALT_PRICE_LOCALES
-        products = rec.get("products") or []
-        for p in products:
-            # primary price
-            if not p.get("price") and category:
-                p["price"] = estimate_price(p["title"], p.get("badge", "MOST POPULAR"), category, currency)
-            # secondary merchant comparison price (retailer chosen per-locale at render)
-            if p.get("price") and not p.get("alt_price") and show_alt:
-                p["alt_price"] = derive_alt_price(p["price"], currency)
-            # description length cap
-            p["description"] = trim_desc(p.get("description", ""))
-        db.table("recommendations").update({"products": products}).eq("id", rec["id"]).execute()
-        updated += 1
-    print(f"Done. Updated {updated} rows. Polls without category: {no_category}.")
+            no_category.add(poll["question"])
+        before = rec.get("products") or []
+        after = apply_prices(before, rec["locale"], category, unmatched)
+        if after == before:
+            continue
+        for b, a in zip(before, after):
+            if b != a:
+                changed_products += 1
+                if (b.get("price"), b.get("alt_price")) != (a.get("price"), a.get("alt_price")):
+                    print(f"  {rec['locale']:5} {a['title'][:52]:52} {b.get('price')!s:>12} -> {a.get('price')!s:<14}"
+                          f" alt {b.get('alt_price')!s:>10} -> {a.get('alt_price')!s}")
+        changed_rows += 1
+        if not args.dry_run:
+            db.table("recommendations").update({"products": after}).eq("id", rec["id"]).execute()
+
+    for q in sorted(no_category):
+        print(f"  ⚠ no category for poll: {q!r}")
+    if unmatched:
+        print(f"\n{len(unmatched)} en/de products have no row in scripts/product_prices.py "
+              "(they keep their price, or get a category estimate if they have none):")
+        for loc, title in sorted(unmatched):
+            print(f"  {loc}  {title}")
+    verb = "Would update" if args.dry_run else "Updated"
+    print(f"\nDone. {verb} {changed_products} products in {changed_rows} rows."
+          f"{' (dry run — nothing written)' if args.dry_run else ''}")
 
 
 if __name__ == "__main__":

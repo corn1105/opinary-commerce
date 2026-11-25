@@ -27,27 +27,29 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.services.poll_service import get_db  # noqa: E402
 
 # (locale, variant) -> price string. Variants matched by title keywords below.
+# en/de must match scripts/product_prices.py (which backfill_prices_and_merchants.py
+# re-applies on every run); German style is "9,95 €" with a no-break space.
 PRICES = {
-    ("en",    "monthly"): "$15/mo",
-    ("en-US", "monthly"): "$15/mo",
+    ("en",    "monthly"): "$14.95/mo",
+    ("en-US", "monthly"): "$14.95/mo",
     ("en-GB", "monthly"): "£8/mo",
     ("en-IE", "monthly"): "€10/mo",
-    ("de",    "monthly"): "€10/Monat",
-    ("de-DE", "monthly"): "€10/Monat",
+    ("de",    "monthly"): "9,95\u00a0€/Monat",
+    ("de-DE", "monthly"): "9,95\u00a0€/Monat",
 
     ("en",    "annual"):  "$149",
     ("en-US", "annual"):  "$149",
     ("en-GB", "annual"):  "£79",
     ("en-IE", "annual"):  "€99",
-    ("de",    "annual"):  "€99",
-    ("de-DE", "annual"):  "€99",
+    ("de",    "annual"):  "99\u00a0€",
+    ("de-DE", "annual"):  "99\u00a0€",
 
     ("en",    "3month"):  "$45",
     ("en-US", "3month"):  "$45",
     ("en-GB", "3month"):  "£24",
     ("en-IE", "3month"):  "€29",
-    ("de",    "3month"):  "€29",
-    ("de-DE", "3month"):  "€29",
+    ("de",    "3month"):  "29,85\u00a0€",
+    ("de-DE", "3month"):  "29,85\u00a0€",
 }
 
 
